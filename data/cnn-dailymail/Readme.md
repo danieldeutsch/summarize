@@ -34,6 +34,5 @@ Spacy tokenized the sentence as
 
 nltk tokenized it correctly:
 > Marseille , France ( CNN ) The French ...
---backend nltk because it does a better job with the (CNN) token. For example,
 
 See et al. (2017) does tokenization with Stanford CoreNLP, which can be downloaded [here](https://github.com/JafferWilson/Process-Data-of-CNN-DailyMail) if necessary.
