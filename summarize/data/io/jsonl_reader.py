@@ -1,6 +1,7 @@
 import bz2
 import gzip
 import json
+from allennlp.common.file_utils import cached_path
 from typing import Any
 
 from summarize.data.io.util import is_gz_file
@@ -22,13 +23,16 @@ class JsonlReader(object):
             for data in f:
                 ...
 
+    The class uses the cached path functionality from AllenNLP, so it is also
+    possible to pass a url to the constructor.
+
     Parameters
     ----------
     file_path: ``str``
         The path to the file where the data should be read.
     """
     def __init__(self, file_path: str) -> None:
-        self.file_path = file_path
+        self.file_path = cached_path(file_path)
 
     def __enter__(self):
         self.binary = False
