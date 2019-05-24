@@ -6,6 +6,7 @@ from allennlp.modules import FeedForward, MatrixAttention, TextFieldEmbedder, To
 from allennlp.nn import InitializerApplicator, RegularizerApplicator
 from allennlp.nn.beam_search import BeamSearch
 from allennlp.nn.util import get_text_field_mask, masked_softmax, weighted_sum
+from allennlp.training.metrics import Metric
 from overrides import overrides
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -68,11 +69,12 @@ class Seq2SeqModel(Model):
                  decoder: RNN,
                  hidden_projection_layer: Optional[FeedForward] = None,
                  memory_projection_layer: Optional[FeedForward] = None,
-                 summary_token_embedder: TokenEmbedder = None,
+                 summary_token_embedder: Optional[TokenEmbedder] = None,
                  summary_namespace: str = 'tokens',
                  beam_size: int = 1,
-                 min_output_length: int = None,
-                 max_output_length: int = None,
+                 min_output_length: Optional[int] = None,
+                 max_output_length: Optional[int] = None,
+                 metrics: Optional[List[Metric]] = None,
                  initializer: InitializerApplicator = InitializerApplicator(),
                  regularizer: RegularizerApplicator = None) -> None:
         super().__init__(vocab, regularizer)
@@ -96,6 +98,7 @@ class Seq2SeqModel(Model):
         self.min_output_length = min_output_length
         self.beam_search = BeamSearch(self.end_index, max_steps=max_output_length,
                                       beam_size=beam_size)
+        self.metrics = metrics
         initializer(self)
 
     def _run_encoder(self, document: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, ...]:
@@ -410,6 +413,30 @@ class Seq2SeqModel(Model):
                                     self._decoder_step)
         return predictions, log_probabilities
 
+    def _update_metrics(self,
+                        predictions: torch.Tensor,
+                        metadata: List[Dict[str, Any]]) -> None:
+        """
+        Updates the metrics based on the predictions and ground-truth summaries.
+
+        Parameters
+        ----------
+        predictions: ``torch.Tensor``, ``(batch_size, beam_size, max_output_length)``
+            The output predictions from beam search.
+        metadata: ``List[Dict[str, Any]]``
+            The batched metadata. In order to successfully update the metrics, the
+            ``"summary"`` must be a key in the metadata.
+        """
+        # If we have acess to the ground-truth summaries, then we can
+        # compute metrics
+        batch_size = predictions.size(0)
+        if 'summary' in metadata[0] and self.metrics is not None:
+            gold_summaries = [metadata[batch]['summary'] for batch in range(batch_size)]
+            # shape: (batch_size, max_output_length)
+            model_summaries = predictions[:, 0, :]
+            for metric in self.metrics:
+                metric(gold_summaries=gold_summaries, model_summaries=model_summaries)
+
     @overrides
     def forward(self,
                 document: Dict[str, torch.Tensor],
@@ -460,6 +487,7 @@ class Seq2SeqModel(Model):
             predictions, log_probabilities = self._run_inference(initial_decoding_state)
             output_dict['predictions'] = predictions
             output_dict['log_probabilities'] = log_probabilities
+            self._update_metrics(predictions, metadata)
 
         # Always include the metadata in the output dictionary
         output_dict['metadata'] = metadata
@@ -489,3 +517,10 @@ class Seq2SeqModel(Model):
 
         output_dict['summary'] = summaries
         return output_dict
+
+    @overrides
+    def get_metrics(self, reset: bool = False) -> Dict[str, float]:
+        metrics = {}
+        for metric in self.metrics:
+            metrics.update(metric.get_metric(reset))
+        return metrics

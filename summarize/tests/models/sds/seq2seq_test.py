@@ -3,6 +3,7 @@ from allennlp.common.testing import ModelTestCase
 # Some imports necessary in order to register the dataset reader and model
 import summarize.data.dataset_readers.sds
 import summarize.models.sds
+import summarize.training.metrics
 from summarize.common.testing import FIXTURES_ROOT
 
 

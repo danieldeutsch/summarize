@@ -68,7 +68,14 @@ local summary_namespace = "summary_tokens";
     },
     "beam_size": 5,
     "min_output_length": 5,
-    "max_output_length": 10
+    "max_output_length": 10,
+    "metrics": [
+      {
+        "type": "python-rouge",
+        "ngram_orders": [2],
+        "namespace": summary_namespace
+      }
+    ]
   },
   "iterator": {
     "type": "basic",
