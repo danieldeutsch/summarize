@@ -88,7 +88,7 @@ def _parse_rouge_stdout(stdout: str) -> Dict[str, float]:
     return metrics
 
 
-def _has_multiple_references(summaries: Union[List[List[str]], List[List[List[str]]]]) -> bool:
+def has_multiple_references(summaries: Union[List[List[str]], List[List[List[str]]]]) -> bool:
     """
     Checks to see if ``summaries`` has multiple references or not by examining
     the type of the summaries. Each individual summary is represented as ``List[str]``.
@@ -161,7 +161,7 @@ def run_rouge(gold_summaries: Union[List[List[str]], List[List[List[str]]]],
     if max_bytes is not None and max_words is not None:
         raise Exception(f'The maximum number of bytes and words cannot both be set.')
 
-    has_multiple_references = _has_multiple_references(gold_summaries)
+    multiple_references = has_multiple_references(gold_summaries)
 
     with TemporaryDirectory() as temp_dir:
         model_filenames = []
@@ -172,7 +172,7 @@ def run_rouge(gold_summaries: Union[List[List[str]], List[List[List[str]]]],
             _save_summary(model_summary, os.path.join(temp_dir, model_filename))
             model_filenames.append(model_filename)
 
-            if not has_multiple_references:
+            if not multiple_references:
                 gold_summary = [gold_summary]
             gold_filenames = []
             for j, summary in enumerate(gold_summary):
