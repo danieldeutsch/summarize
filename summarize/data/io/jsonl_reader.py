@@ -3,6 +3,8 @@ import gzip
 import json
 from typing import Any
 
+from summarize.data.io.util import is_gz_file
+
 
 class JsonlReader(object):
     """
@@ -10,7 +12,9 @@ class JsonlReader(object):
     objects from a jsonl file. The reader will automatically deserialize and return
     one object from each line in the file. The data in the file will be decoded
     from a binary file depending on the extension of the file name. Current
-    supported binary formats are gzip (``.gz``) and bz2 (``.bz2``).
+    supported binary formats are gzip (``.gz``) and bz2 (``.bz2``). For gzip only,
+    this will also inspect the file to see if it's gzipped in addition to checking
+    the extension.
 
     The class should be used the same way that a built-in file handler works::
 
@@ -28,7 +32,7 @@ class JsonlReader(object):
 
     def __enter__(self):
         self.binary = False
-        if self.file_path.endswith('.gz'):
+        if self.file_path.endswith('.gz') or is_gz_file(self.file_path):
             self.file_handler = gzip.open(self.file_path, 'rb')
             self.binary = True
         elif self.file_path.endswith('.bz2'):
