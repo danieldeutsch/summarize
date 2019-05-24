@@ -1,3 +1,4 @@
+from allennlp.common.file_utils import cached_path
 from allennlp.data import DatasetReader, Instance
 from allennlp.data.fields import MetadataField, TextField
 from allennlp.data.token_indexers import SingleIdTokenIndexer, TokenIndexer
@@ -53,6 +54,7 @@ class AbstractiveDatasetReader(DatasetReader):
 
     @overrides
     def _read(self, file_path: str) -> Iterable[Instance]:
+        file_path = cached_path(file_path)
         with JsonlReader(file_path) as f:
             for data in f:
                 document = data['document']
