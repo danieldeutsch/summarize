@@ -1,5 +1,6 @@
 import os
 import requests
+import urllib
 
 from summarize.data.io import JsonlReader
 
@@ -11,12 +12,12 @@ def download_from_google_drive(file_id: str, expected_size: int, file_path: str)
 
     Parameters
     ----------
-    file_id: ``str``
+    file_id: ``str``, required.
         The ID of the file to download. The ID can be found in the url of the
         file on Google Drive.
-    expected_size: ``int``
+    expected_size: ``int``, required.
         The expected file size in bytes.
-    file_path: ``str``
+    file_path: ``str``, required.
         The path to where the file should be saved. The parent directories are
         created if they don't exist.
     """
@@ -53,6 +54,33 @@ def download_from_google_drive(file_id: str, expected_size: int, file_path: str)
         params = {'id': file_id, 'confirm': token}
         response = session.get(url, params=params, stream=True)
     save_response_content(response, file_path, expected_size)
+
+
+def download_url_to_file(url: str, file_path: str, force: bool = False) -> None:
+    """
+    Downloads a url to a local file if it does not already exist. The directory
+    path to the download file will be created if it does not exist.
+
+    Parameters
+    ----------
+    url: ``str``, required.
+        The url of the file to download.
+    file_path: ``str``, required.
+        The path where the file should be saved.
+    force: ``bool``, optional (default = ``False``)
+        If false, the file is not downloaded if it exists. Otherwise, the
+        file will be downloaded no matter what.
+    """
+    dirname = os.path.dirname(file_path)
+    if dirname:
+        os.makedirs(dirname, exist_ok=True)
+
+    if os.path.exists(file_path) and not force:
+        print(f'Skipping downloading {url}')
+        return
+
+    print(f'Downloading {url} to {file_path}')
+    urllib.request.urlretrieve(url, file_path)
 
 
 def assert_line_count(file_path: str, expected_count: int):
