@@ -16,6 +16,39 @@ The number of training instances is different from the reported number in [See e
 (although the 114 number is off by 1).
 The number does match later work, such as [Kedzie et al. (2018)](https://arxiv.org/pdf/1810.12343.pdf).
 
+The files can be downloaded from AWS here:
+
+  <table>
+    <thead>
+      <tr>
+        <th>Corpus</th>
+        <th>Train</th>
+        <th>Valid</th>
+        <th>Test</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th>CNN</t>
+        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn/train.v1.0.jsonl.gz</t>
+        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn/valid.v1.0.jsonl.gz</t>
+        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn/test.v1.0.jsonl.gz</t>
+      </tr>
+      <tr>
+        <th>DailyMail</t>
+        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/dailymail/train.v1.0.jsonl.gz</t>
+        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/dailymail/valid.v1.0.jsonl.gz</t>
+        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/dailymail/test.v1.0.jsonl.gz</t>
+      </tr>
+      <tr>
+        <th>CNN/DailyMail</t>
+        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/train.v1.0.jsonl.gz</t>
+        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/valid.v1.0.jsonl.gz</t>
+        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/test.v1.0.jsonl.gz</t>
+      </tr>
+    </tbody>
+  </table>
+
 ### Tokenization
 If you want to preprocess the dataset with tokenization, run the following tokenization command on each of the relevant splits:
 ```
@@ -36,3 +69,36 @@ nltk tokenized it correctly:
 > Marseille , France ( CNN ) The French ...
 
 See et al. (2017) does tokenization with Stanford CoreNLP, which can be downloaded [here](https://github.com/JafferWilson/Process-Data-of-CNN-DailyMail) if necessary.
+
+The tokenized files can be downloaded from AWS here:
+
+  <table>
+    <thead>
+      <tr>
+        <th>Corpus</th>
+        <th>Train</th>
+        <th>Valid</th>
+        <th>Test</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <th>CNN</t>
+        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn/train.tokenized.v1.0.jsonl.gz</t>
+        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn/valid.tokenized.v1.0.jsonl.gz</t>
+        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn/test.tokenized.v1.0.jsonl.gz</t>
+      </tr>
+      <tr>
+        <th>DailyMail</t>
+        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/dailymail/train.tokenized.v1.0.jsonl.gz</t>
+        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/dailymail/valid.tokenized.v1.0.jsonl.gz</t>
+        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/dailymail/test.tokenized.v1.0.jsonl.gz</t>
+      </tr>
+      <tr>
+        <th>CNN/DailyMail</t>
+        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/train.tokenized.v1.0.jsonl.gz</t>
+        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/valid.tokenized.v1.0.jsonl.gz</t>
+        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/test.tokenized.v1.0.jsonl.gz</t>
+      </tr>
+    </tbody>
+  </table>
