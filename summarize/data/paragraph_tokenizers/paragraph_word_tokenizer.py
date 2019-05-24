@@ -1,4 +1,7 @@
 from allennlp.data.tokenizers import Token, WordTokenizer
+from allennlp.data.tokenizers.word_filter import WordFilter, PassThroughWordFilter
+from allennlp.data.tokenizers.word_splitter import WordSplitter
+from allennlp.data.tokenizers.word_stemmer import WordStemmer, PassThroughWordStemmer
 from overrides import overrides
 from typing import List
 
@@ -14,15 +17,31 @@ class ParagraphWordTokenizer(ParagraphTokenizer):
 
     Parameters
     ----------
+    word_splitter: ``WordSplitter``, optional (default = ``None``)
+        See ``WordTokenizer``
+    word_filter: ``WordFilter``, optional (default = ``PassThroughWordFilter()``)
+        See ``WordTokenizer``
+    word_stemmer: ``WordStemmer``, optional (default = ``PassThroughWordStemmer()``)
+        See ``WordTokenizer``
+    start_tokens: ``List[str]``, optional (default = ``[]``)
+        See ``WordTokenizer``
+    end_tokens: ``List[str]``, optional (default = ``[]``)
+        See ``WordTokenizer``
     in_between_tokens: ``List[str]``, optional (default = ``[]``)
         The tokens to insert in between sentences.
-    kwargs: optional
-        The kwargs to pass to the ``WordTokenizer`` constructor.
     """
     def __init__(self,
-                 in_between_tokens: List[str] = None,
-                 **kwargs):
-        self.tokenizer = WordTokenizer(**kwargs)
+                 word_splitter: WordSplitter = None,
+                 word_filter: WordFilter = PassThroughWordFilter(),
+                 word_stemmer: WordStemmer = PassThroughWordStemmer(),
+                 start_tokens: List[str] = None,
+                 end_tokens: List[str] = None,
+                 in_between_tokens: List[str] = None):
+        self.tokenizer = WordTokenizer(word_splitter=word_splitter,
+                                       word_filter=word_filter,
+                                       word_stemmer=word_stemmer,
+                                       start_tokens=start_tokens,
+                                       end_tokens=end_tokens)
         self.in_between_tokens = in_between_tokens or []
         self.in_between_tokens = [Token(token) for token in self.in_between_tokens]
 
