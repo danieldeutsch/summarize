@@ -35,7 +35,7 @@ local hidden_size = 512;
       "tokens": ["@start@", "@end@"]
     }
   },
-  "train_data_path": "https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/train.tokenized.v1.0.jsonl.gz",
+  "train_data_path": "https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/valid.tokenized.v1.0.jsonl.gz",
   "validation_data_path": "https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/valid.tokenized.v1.0.jsonl.gz",
   "model": {
     "type": "sds-seq2seq",
@@ -64,7 +64,7 @@ local hidden_size = 512;
       "attention_size": hidden_size
     },
     "attention_layer": {
-      "input_dim": hidden_size + hidden_size
+      "input_dim": hidden_size + hidden_size,
       "hidden_dims": hidden_size,
       "num_layers": 1,
       "activations": "linear"
