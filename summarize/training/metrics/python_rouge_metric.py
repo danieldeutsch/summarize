@@ -5,6 +5,7 @@ from allennlp.training.metrics import Metric
 from overrides import overrides
 from typing import Dict, List, Optional, Union
 
+from summarize.common.util import SENT_START_SYMBOL, SENT_END_SYMBOL
 from summarize.metrics.python_rouge import PythonRouge
 
 
@@ -56,9 +57,26 @@ class PythonRougeMetric(Metric):
 
         self.vocab = vocab
         self.namespace = namespace
-        self.start_index = vocab.get_token_index(START_SYMBOL, namespace)
-        self.end_index = vocab.get_token_index(END_SYMBOL, namespace)
-        self.pad_index = vocab.get_token_index(DEFAULT_PADDING_TOKEN, namespace)
+        vocab_tokens = vocab.get_token_to_index_vocabulary(namespace)
+
+        # Extract the special tokens from the vocabulary. We need to check and
+        # ensure each one exists, otherwise we would get the OOV symbol, which
+        # we don't want to skip when converting from indices to strings.
+        self.start_index = None
+        if START_SYMBOL in vocab_tokens:
+            self.start_index = vocab_tokens[START_SYMBOL]
+        self.end_index = None
+        if END_SYMBOL in vocab_tokens:
+            self.end_index = vocab_tokens[END_SYMBOL]
+        self.pad_index = None
+        if DEFAULT_PADDING_TOKEN in vocab_tokens:
+            self.pad_index = vocab_tokens[DEFAULT_PADDING_TOKEN]
+        self.sent_start_index = None
+        if SENT_START_SYMBOL in vocab_tokens:
+            self.sent_start_index = vocab_tokens[SENT_START_SYMBOL]
+        self.sent_end_index = None
+        if SENT_END_SYMBOL in vocab_tokens:
+            self.sent_end_index = vocab_tokens[SENT_END_SYMBOL]
 
         self.count = 0
         self.totals = {}
@@ -68,9 +86,12 @@ class PythonRougeMetric(Metric):
         tokens = []
         for index in tensor:
             index = index.item()
-            if index == self.start_index:
+            # We skip the start, sentence start, and sentence end symbols. It is
+            # ok if these symbols are ``None`` since they won't match the index
+            if index in [self.start_index, self.sent_start_index, self.sent_end_index]:
                 continue
-            if index == self.end_index or index == self.pad_index:
+            # We end if we see the end or padding index
+            if index in [self.end_index, self.pad_index]:
                 break
             tokens.append(self.vocab.get_token_from_index(index, self.namespace))
         return tokens

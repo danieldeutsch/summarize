@@ -1,5 +1,7 @@
 local embed_size = 128;
-local hidden_size = 512;
+local hidden_size = 256;
+local encoder_hidden_size = hidden_size * 2;
+local decoder_hidden_size = hidden_size;
 
 {
   "dataset_reader": {
@@ -16,9 +18,9 @@ local hidden_size = 512;
       "word_splitter": {
         "type": "just_spaces"
       },
-      "start_tokens": ["@start@"],
-      "end_tokens": ["@end@"],
-      "in_between_tokens": ["@end@", "@start@"]
+      "start_tokens": ["@start@", "@sent_start@"],
+      "end_tokens": ["@sent_end@", "@end@"],
+      "in_between_tokens": ["@sent_end@", "@sent_start@"]
     },
     "document_token_indexers": {
       "tokens": {
@@ -32,7 +34,7 @@ local hidden_size = 512;
   "vocabulary": {
     "max_vocab_size": 50000,
     "tokens_to_add": {
-      "tokens": ["@start@", "@end@"]
+      "tokens": ["@start@", "@end@", "@sent_start@", "@sent_end@"]
     }
   },
   "train_data_path": "https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/train.tokenized.v1.0.jsonl.gz",
@@ -48,33 +50,41 @@ local hidden_size = 512;
     "encoder": {
       "type": "lstm",
       "input_size": embed_size,
-      "hidden_size": hidden_size / 2,
+      "hidden_size": encoder_hidden_size / 2,
       "bidirectional": true
     },
     "hidden_projection_layer": {
-      "input_dim": hidden_size,
-      "hidden_dims": hidden_size,
+      "input_dim": encoder_hidden_size,
+      "hidden_dims": decoder_hidden_size,
+      "num_layers": 1,
+      "activations": "relu"
+    },
+    "memory_projection_layer": {
+      "input_dim": encoder_hidden_size,
+      "hidden_dims": decoder_hidden_size,
       "num_layers": 1,
       "activations": "relu"
     },
     "attention": {
       "type": "mlp",
-      "encoder_size": hidden_size,
-      "decoder_size": hidden_size,
-      "attention_size": hidden_size
+      "encoder_size": encoder_hidden_size,
+      "decoder_size": decoder_hidden_size,
+      "attention_size": encoder_hidden_size
     },
     "attention_layer": {
-      "input_dim": hidden_size + hidden_size,
-      "hidden_dims": hidden_size,
+      "input_dim": encoder_hidden_size + decoder_hidden_size,
+      "hidden_dims": decoder_hidden_size,
       "num_layers": 1,
       "activations": "linear"
     },
     "decoder": {
       "type": "lstm",
-      "input_size": embed_size,
-      "hidden_size": hidden_size
+      "input_size": embed_size + decoder_hidden_size,
+      "hidden_size": decoder_hidden_size
     },
+    "use_input_feeding": true,
     "beam_size": 4,
+    "min_output_length": 35,
     "max_output_length": 100,
     "metrics": [
       {

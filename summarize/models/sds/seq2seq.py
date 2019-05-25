@@ -10,6 +10,7 @@ from allennlp.training.metrics import Metric
 from overrides import overrides
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from summarize.common.util import SENT_START_SYMBOL, SENT_END_SYMBOL
 from summarize.modules.rnns import RNN
 
 
@@ -103,9 +104,23 @@ class Seq2SeqModel(Model):
         # hidden state are combined. It is used to calculate the softmax over the
         # summary vocabulary
         self.output_layer = torch.nn.Linear(decoder.get_output_dim(), vocab.get_vocab_size(summary_namespace))
-        self.start_index = vocab.get_token_index(START_SYMBOL, summary_namespace)
-        self.end_index = vocab.get_token_index(END_SYMBOL, summary_namespace)
-        self.pad_index = vocab.get_token_index(DEFAULT_PADDING_TOKEN, summary_namespace)
+
+        # Retrieve some special vocabulary token indices. Some of them are
+        # required to exist.
+        token_to_index = vocab.get_token_to_index_vocabulary(summary_namespace)
+        assert START_SYMBOL in token_to_index
+        self.start_index = token_to_index[START_SYMBOL]
+        assert END_SYMBOL in token_to_index
+        self.end_index = token_to_index[END_SYMBOL]
+        assert DEFAULT_PADDING_TOKEN in token_to_index
+        self.pad_index = token_to_index[DEFAULT_PADDING_TOKEN]
+        self.sent_start_index = None
+        if SENT_START_SYMBOL in token_to_index:
+            self.sent_start_index = token_to_index[SENT_START_SYMBOL]
+        self.sent_end_index = None
+        if SENT_END_SYMBOL in token_to_index:
+            self.sent_end_index = token_to_index[SENT_END_SYMBOL]
+
         self.loss = torch.nn.CrossEntropyLoss(ignore_index=self.pad_index, reduction='mean')
         self.min_output_length = min_output_length
         self.beam_search = BeamSearch(self.end_index, max_steps=max_output_length,
@@ -614,11 +629,12 @@ class Seq2SeqModel(Model):
             for i in range(max_output_length):
                 # The best prediction is in the 0th beam position
                 index = predictions[batch, 0, i].item()
-                if index == self.start_index or self.end_index:
-                    # The end index also separates sentences, so it does not
-                    # mean we should stop.
+                # We skip the start, sentence start, and sentence end indices. It is ok
+                # if these are ``None`` because the index should never be ``None``
+                if index in [self.start_index, self.sent_start_index, self.sent_end_index]:
                     continue
-                if index == self.pad_index:
+                # We stop decoding if we see the end or pad symbols
+                if index in [self.end_index, self.pad_index]:
                     break
                 token = self.vocab.get_token_from_index(index, self.summary_namespace)
                 tokens.append(token)
