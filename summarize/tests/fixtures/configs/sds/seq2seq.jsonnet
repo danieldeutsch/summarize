@@ -4,8 +4,8 @@ local summary_namespace = "summary_tokens";
 {
   "dataset_reader": {
     "type": "sds-abstractive",
-    "max_document_length": 400,
-    "max_summary_length": 50,
+    "max_document_length": 40,
+    "max_summary_length": 15,
     "summary_tokenizer": {
       "type": "word",
       "word_splitter": {
@@ -65,6 +65,13 @@ local summary_namespace = "summary_tokens";
       "type": "lstm",
       "input_size": 10,
       "hidden_size": 40
+    },
+    "use_input_feeding": true,
+    "input_feeding_projection_layer": {
+      "input_dim": 10 + 40,
+      "hidden_dims": 10,
+      "num_layers": 1,
+      "activations": "linear"
     },
     "beam_size": 5,
     "min_output_length": 5,
