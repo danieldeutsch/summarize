@@ -8,7 +8,7 @@ from allennlp.nn.beam_search import BeamSearch
 from allennlp.nn.util import get_text_field_mask, masked_softmax, weighted_sum
 from allennlp.training.metrics import Metric
 from overrides import overrides
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 from summarize.modules.rnns import RNN
 
@@ -53,6 +53,14 @@ class Seq2SeqModel(Model):
     summary_namespace: ``str``, optional (default = ``"tokens"``)
         The namespace of the summary tokens which is used to map from the integer
         token representation to the string token representation.
+    use_input_feeding: ``bool``, optional (default = ``False``)
+        Indicates if input feeding should be used. See https://arxiv.org/pdf/1508.04025.pdf
+        for details.
+    input_feeding_projection_layer: ``FeedForward``, optional (default = ``None``)
+        If input feeding is used, the ``input_feeding_projection_layer`` will optionally
+        run on the concatenated input embedding and context vector. The output will
+        be passed as input to the decoder. This is not specified in Luong et al. (2015),
+        but it is used in See et al. (2017).
     beam_size: ``int``, optional (default = 1)
         The size of the beam to use for decoding.
     min_output_length: ``int``, optional (default = ``None``)
@@ -71,6 +79,8 @@ class Seq2SeqModel(Model):
                  memory_projection_layer: Optional[FeedForward] = None,
                  summary_token_embedder: Optional[TokenEmbedder] = None,
                  summary_namespace: str = 'tokens',
+                 use_input_feeding: bool = False,
+                 input_feeding_projection_layer: Optional[FeedForward] = None,
                  beam_size: int = 1,
                  min_output_length: Optional[int] = None,
                  max_output_length: Optional[int] = None,
@@ -87,6 +97,8 @@ class Seq2SeqModel(Model):
         self.memory_projection_layer = memory_projection_layer
         self.summary_token_embedder = summary_token_embedder
         self.summary_namespace = summary_namespace
+        self.use_input_feeding = use_input_feeding
+        self.input_feeding_projection_layer = input_feeding_projection_layer
         # The ``output_layer`` is applied after the attention context and decoder
         # hidden state are combined. It is used to calculate the softmax over the
         # summary vocabulary
@@ -248,12 +260,14 @@ class Seq2SeqModel(Model):
         # Unpack everything from the input state
         # shape: (group_size, num_document_tokens)
         document_mask = state['document_mask']
-        # shape: (group_size, encoder_hidden_size, num_document_tokens)
+        # shape: (group_size, num_document_tokens, encoder_hidden_size)
         encoder_outputs = state['encoder_outputs']
         # shape: (group_size, decoder_hidden_size)
         hidden = state['hidden']
         # shape: (group_size, decoder_hidden_size)
         memory = state['memory']
+        # shape: (group_size, decoder_hidden_size)
+        input_feed = state['input_feed']
 
         # Get the token embeddings
         # shape: (group_size, num_summary_tokens, embedding_size)
@@ -270,14 +284,40 @@ class Seq2SeqModel(Model):
         else:
             decoder_state = hidden
 
-        # Pass the tokens through the decoder. Masking is not necessary because
-        # if this method is used for beam search, anything after <eos> will be
-        # discarded. If it's used for computing the loss, we will ignore anything
-        # after <eos> when computing the loss function. In neither case do we
-        # care about having an incorrect hidden state.
-        # shape: (group_size, num_summary_tokens, decoder_hidden_size)
-        # shape: (1, group_size, decoder_hidden_size)
-        decoder_outputs, decoder_state = self.decoder(summary_token_embeddings, None, decoder_state)
+        # If we use input feeding, we have to manually pass all of the summary
+        # tokens through the decoder with a for loop. Otherwise, we can use
+        # the vectorized version, which should be faster
+        if self.use_input_feeding:
+            decoder_outputs = []
+            for i in range(num_summary_tokens):
+                # Setup the input to the decoder, optionally using input feeding
+                # shape: (batch_size, embedding_size)
+                input_embedding = summary_token_embeddings[:, i, :]
+                # shape: (batch_size, input_feeding_size)
+                input_embedding = self._apply_input_feeding(input_embedding, input_feed)
+                # shape: (batch_size, 1, embedding_size)
+                input_embedding = input_embedding.unsqueeze(1)
+
+                # Pass the input through the decoder
+                # shape: (group_size, 1, decoder_hidden_size)
+                # shape: (1, group_size, decoder_hidden_size)
+                decoder_output, decoder_state = \
+                    self._decoder_forward(input_embedding, decoder_state, encoder_outputs, document_mask)
+
+                # Save the decoder output
+                decoder_outputs.append(decoder_output)
+                # Take the new ``input_feed`` vector
+                # shape: (group_size, decoder_hidden_size)
+                input_feed = decoder_output.squeeze(1)
+
+            # Combine all the decoder outputs
+            # shape: (group_size, num_summary_tokens, decoder_hidden_size)
+            decoder_outputs = torch.cat(decoder_outputs, dim=1)
+        else:
+            # shape: (group_size, num_summary_tokens, decoder_hidden_size)
+            # shape: (1, group_size, decoder_hidden_size)
+            decoder_outputs, decoder_state = \
+                self._decoder_forward(summary_token_embeddings, decoder_state, encoder_outputs, document_mask)
 
         # Remove the first dimension which is unnecessary as this is only
         # implemented for 1 layer.
@@ -291,13 +331,9 @@ class Seq2SeqModel(Model):
             # shape: (group_size, decoder_hidden_size)
             hidden = hidden.squeeze(0)
 
-        # Compute the new hidden state representation through attention.
-        # shape: (group_size, num_summary_tokens, decoder_hidden_size)
-        hidden_with_attention = self._compute_attention(encoder_outputs, document_mask, decoder_outputs)
-
         # Project the hidden state to get a score for each vocabulary token
         # shape: (group_size, num_summary_tokens, summary_vocab_size)
-        logits = self.output_layer(hidden_with_attention)
+        logits = self.output_layer(decoder_outputs)
 
         # Reshape the logits if there was only 1 summary token. This is typically
         # because it's being called from `BeamSearch`
@@ -308,8 +344,76 @@ class Seq2SeqModel(Model):
         output_state = dict(state)
         output_state['hidden'] = hidden
         output_state['memory'] = memory
+        output_state['input_feed'] = input_feed
 
         return logits, output_state
+
+    def _apply_input_feeding(self,
+                             embedding: torch.Tensor,
+                             input_feed: torch.Tensor) -> torch.Tensor:
+        """
+        Applies input feeding to combine the embedding and context vectors.
+
+        Parameters
+        ----------
+        embedding: ``torch.Tensor``, ``(batch_size, embedding_size)``
+            The summary token embeddings
+        input_feed: ``torch.Tensor``, ``(batch_size, encoder_hidden_size)``
+            The input feeding vector
+
+        Returns
+        -------
+        embedding: ``torch.Tensor``, ``(batch_size, input_feeding_size)``
+            The combined vector which should be passed as input the decoder.
+        """
+        # shape: (batch_size, embedding_size + decoder_hidden_size)
+        input_embedding = torch.cat([embedding, input_feed], dim=1)
+        if self.input_feeding_projection_layer is not None:
+            # shape: (batch_size, input_feeding_size)
+            input_embedding = self.input_feeding_projection_layer(input_embedding)
+        return input_embedding
+
+    def _decoder_forward(self,
+                         input_vectors: torch.Tensor,
+                         hidden: Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]],
+                         encoder_outputs: torch.Tensor,
+                         encoder_mask: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Runs the RNN decoder on the input vectors and hidden state and applies
+        the attention mechanism.
+
+        Parameters
+        ----------
+        input_vectors: ``torch.Tensor``, ``(batch_size, num_summary_tokens, input_size)``
+            The input vectors.
+        hidden: ``Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]``
+            The RNN hidden state.
+        encoder_outputs: ``torch.Tensor``, ``(batch_size, num_document_tokens, encoder_hidden_size)``
+            The encoder output states.
+        encoder_mask: ``torch.Tensor``, ``(batch_size, num_document_tokens)``
+            The document mask.
+
+        Returns
+        -------
+        decoder_outputs: ``torch.Tensor``, ``(batch_size, num_summary_tokens, decoder_hidden_size)``
+            The decoder hidden representation with attention.
+        hidden: ``Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]``
+            The final hidden states.
+        """
+        # Pass the tokens through the decoder. Masking is not necessary because
+        # if this method is used for beam search, anything after <eos> will be
+        # discarded. If it's used for computing the loss, we will ignore anything
+        # after <eos> when computing the loss function. In neither case do we
+        # care about having an incorrect hidden state.
+        #
+        # shape: (group_size, num_summary_tokens, decoder_hidden_size)
+        # shape: (1, group_size, decoder_hidden_size)
+        decoder_outputs, hidden = self.decoder(input_vectors, None, hidden)
+
+        # Add in the attention mechanism
+        # shape: (group_size, num_summary_tokens, decoder_hidden_size)
+        decoder_outputs = self._compute_attention(encoder_outputs, encoder_mask, decoder_outputs)
+        return decoder_outputs, hidden
 
     def _compute_attention(self,
                            encoder_outputs: torch.Tensor,
@@ -463,12 +567,18 @@ class Seq2SeqModel(Model):
         encoder_outputs, document_mask, hidden, memory = \
             self._run_encoder(document)
 
+        # The ``input_feed`` vector will not be used unless input feeding is enabled.
+        # Initially, it will be all 0s.
+        # shape: (batch_size, decoder_hidden_size)
+        input_feed = encoder_outputs.new_zeros(encoder_outputs.size(0), self.attention_layer.get_output_dim())
+
         # Setup the state which will be used to initialize decoding
         initial_decoding_state = {
             'document_mask': document_mask,
             'encoder_outputs': encoder_outputs,
             'hidden': hidden,
-            'memory': memory
+            'memory': memory,
+            'input_feed': input_feed
         }
 
         output_dict = {}
