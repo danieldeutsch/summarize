@@ -4,7 +4,7 @@ results_dir=${expt_dir}/results
 
 for split in valid test; do
   python -m summarize.metrics.rouge \
-    https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/${split}.tokenized.v1.0.jsonl.gz
+    https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/${split}.tokenized.v1.0.jsonl.gz \
     ${output_dir}/${split}.jsonl \
     --output-file ${results_dir}/${split}.metrics.json
 done
