@@ -168,7 +168,7 @@ class Seq2SeqModel(Model):
             hidden = self.hidden_projection_layer(hidden)
         if self.memory_projection_layer is not None:
             # shape: (batch_size, decoder_hidden_size)
-            memory = self.hidden_projection_layer(memory)
+            memory = self.memory_projection_layer(memory)
 
         return encoder_outputs, document_mask, hidden, memory
 
