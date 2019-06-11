@@ -142,21 +142,21 @@ class Seq2SeqModel(Model):
             # shape: (batch_size, encoder_hidden_size * num_directions)
             hidden = hidden.squeeze(0)
 
+        # Apply the bridge layer
         if self.bridge is not None:
             # shape: (batch_size, decoder_hidden_size)
             hidden = self.bridge(hidden)
 
-        # Project the encoder hidden state onto the initial decoder hidden state
+        # Split the hidden state's tuple items for decoding purposes. The generic
+        # beam search code expects tensors as values in the state dictionary, so
+        # we can't use the default tuple-based implementation. This means we have
+        # to create a ``memory`` tensor even if it's not used (e.g., by a GRU) or
+        # else the reshaping logic of the decoding will fail. However, it will not
+        # be used.
         if self.encoder.has_memory():
             # shape: (batch_size, encoder_hidden_size * num_directions)
             hidden, memory = hidden
         else:
-            # We still create the memory even if the decoder is a GRU because the
-            # beam search code will try to reshape every tensor and it will fail if
-            # it is `None`. However, it won't be used in computation. If this ever
-            # gets changed to be initialized to the encoder's memory, we should also
-            # add its own projection layer.
-            # shape: (batch_size, encoder_hidden_size * num_directions)
             memory = hidden.new_zeros(hidden.size())
 
         return encoder_outputs, document_mask, hidden, memory
