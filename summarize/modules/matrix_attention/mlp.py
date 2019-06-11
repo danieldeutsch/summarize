@@ -25,8 +25,8 @@ class MLPAttention(MatrixAttention):
                  attention_size: int) -> None:
         super().__init__()
         self.linear_context = torch.nn.Linear(encoder_size, attention_size, bias=False)
-        self.linear_query = torch.nn.Linear(decoder_size, attention_size, bias=False)
-        self.v = torch.nn.Linear(attention_size, 1, bias=True)
+        self.linear_query = torch.nn.Linear(decoder_size, attention_size, bias=True)
+        self.v = torch.nn.Linear(attention_size, 1, bias=False)
 
     @overrides
     def forward(self,
