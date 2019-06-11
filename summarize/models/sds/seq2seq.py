@@ -88,7 +88,7 @@ class Seq2SeqModel(Model):
         self.attention_layer = attention_layer
         self.decoder = decoder
         self.bridge = bridge
-        self.summary_token_embedder = summary_token_embedder  or document_token_embedder._token_embedders['tokens']
+        self.summary_token_embedder = summary_token_embedder or document_token_embedder._token_embedders['tokens']
         self.summary_namespace = summary_namespace
         self.use_input_feeding = use_input_feeding
         self.input_feeding_projection_layer = input_feeding_projection_layer
