@@ -10,6 +10,7 @@ from allennlp.training.metrics import Metric
 from overrides import overrides
 from typing import Any, Dict, List, Optional, Tuple
 
+from summarize.modules.bridge import Bridge
 from summarize.modules.rnns import RNN
 
 
@@ -37,16 +38,9 @@ class Seq2SeqModel(Model):
         performance and training speed.
     decoder: ``RNN``
         The RNN that will produce the sequence of summary tokens.
-    hidden_projection_layer: ``FeedForward``, optional (default = ``None``)
-        The ``hidden_projection_layer`` is applied to the final encoder hidden
-        state. The output size should be equal to the decoder's hidden size. This
-        is sometimes used to map a bidirectional encoder's hidden state to a single
-        directional decoder's hidden state since the bidirectional encoder's hidden
-        state will be twice the size as the decoder's hidden state. If ``None``,
-        no projection will be used.
-    memory_projection_layer: ``FeedForward``, optional (default = ``None``)
-        The same as ``hidden_projection_layer`` except applied to the memory cell
-        of the RNN if it has memory.
+    bridge: ``Bridge``, optional (default = ``None``)
+        The bridge layer to use in between the encoder final state and the
+        initial decoder hidden state. If ``None``, no layer will be used.
     summary_token_embedder: ``TokenEmbedder``, optional (default = ``None``)
         The ``TokenEmbedder`` that will embed the summary tokens. If ``None``, the
         ``document_token_embedder``'s embedder for the ``"tokens"`` will be used.
@@ -67,8 +61,7 @@ class Seq2SeqModel(Model):
                  attention: MatrixAttention,
                  attention_layer: FeedForward,
                  decoder: RNN,
-                 hidden_projection_layer: Optional[FeedForward] = None,
-                 memory_projection_layer: Optional[FeedForward] = None,
+                 bridge: Bridge,
                  summary_token_embedder: Optional[TokenEmbedder] = None,
                  summary_namespace: str = 'tokens',
                  beam_size: int = 1,
@@ -83,8 +76,7 @@ class Seq2SeqModel(Model):
         self.attention = attention
         self.attention_layer = attention_layer
         self.decoder = decoder
-        self.hidden_projection_layer = hidden_projection_layer
-        self.memory_projection_layer = memory_projection_layer
+        self.bridge = bridge
         self.summary_token_embedder = summary_token_embedder
         self.summary_namespace = summary_namespace
         # The ``output_layer`` is applied after the attention context and decoder
@@ -150,6 +142,10 @@ class Seq2SeqModel(Model):
             # shape: (batch_size, encoder_hidden_size * num_directions)
             hidden = hidden.squeeze(0)
 
+        if self.bridge is not None:
+            # shape: (batch_size, decoder_hidden_size)
+            hidden = self.bridge(hidden)
+
         # Project the encoder hidden state onto the initial decoder hidden state
         if self.encoder.has_memory():
             # shape: (batch_size, encoder_hidden_size * num_directions)
@@ -162,13 +158,6 @@ class Seq2SeqModel(Model):
             # add its own projection layer.
             # shape: (batch_size, encoder_hidden_size * num_directions)
             memory = hidden.new_zeros(hidden.size())
-
-        if self.hidden_projection_layer is not None:
-            # shape: (batch_size, decoder_hidden_size)
-            hidden = self.hidden_projection_layer(hidden)
-        if self.memory_projection_layer is not None:
-            # shape: (batch_size, decoder_hidden_size)
-            memory = self.memory_projection_layer(memory)
 
         return encoder_outputs, document_mask, hidden, memory
 
