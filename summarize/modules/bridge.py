@@ -14,7 +14,7 @@ class Bridge(torch.nn.Module, FromParams):
     forward and backward RNNs, as in the OpenNMT implementation of the bridge.
     The input to forward is expected to be tensors of size ``(batch_size, encoder_hidden_size)``.
     If the encoder is bidirectional, both directions' hidden states are expected to be
-    already concatenated together. If ``share_parameters`` is set, the input
+    already concatenated together. If ``share_bidirectional_parameters`` is set, the input
     tensors are reshaped into ``(batch_size, 2, encoder_hidden_size // 2)``-sized tensors,
     passed through the linear layers, and then reshaped back to the expected output sizes.
 
@@ -22,18 +22,19 @@ class Bridge(torch.nn.Module, FromParams):
     ----------
     layers: ``List[FeedForward]``
         The linear layers, one for each hidden state of the RNN.
-    share_parameters: ``bool``, optional (default = ``False``)
+    share_bidirectional_parameters: ``bool``, optional (default = ``False``)
         Indicates whether the forward and backward directions should share the
-        same linear layer parameters.
+        same linear layer parameters. If a single-directional encoder is used,
+        this should be ``False``.
     """
     def __init__(self,
                  layers: List[FeedForward],
-                 share_parameters: bool = False) -> None:
+                 share_bidirectional_parameters: bool = False) -> None:
         super().__init__()
         # The layers have to be mapped as a ``ModuleList`` or else they won't
         # be detected as parameters for the model
         self.layers = torch.nn.ModuleList(layers)
-        self.share_parameters = share_parameters
+        self.share_bidirectional_parameters = share_bidirectional_parameters
 
     def forward(self, hidden: Union[torch.Tensor, Tuple[torch.Tensor, ...]]) -> Union[torch.Tensor, Tuple[torch.Tensor, ...]]:
         """
@@ -59,7 +60,7 @@ class Bridge(torch.nn.Module, FromParams):
 
         # If we are going to share parameters across the forward and backward
         # directions, then we need to separate them in the tensors
-        if self.share_parameters:
+        if self.share_bidirectional_parameters:
             # shape: (batch_size, 2, encoder_hidden_size // 2)
             hidden = tuple(h.view(batch_size, 2, -1) for h in hidden)
 
@@ -67,7 +68,7 @@ class Bridge(torch.nn.Module, FromParams):
         output = tuple(layer(h) for layer, h in zip(self.layers, hidden))
 
         # Reshape the tensors if the parameters are shared
-        if self.share_parameters:
+        if self.share_bidirectional_parameters:
             # shape: (batch_size, decoder_hidden_size)
             output = tuple(h.view(batch_size, -1) for h in output)
 

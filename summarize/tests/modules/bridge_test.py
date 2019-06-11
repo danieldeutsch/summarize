@@ -19,7 +19,7 @@ class TestBridge(unittest.TestCase):
     def test_single_layer_shared(self):
         batch_size, input_hidden_size, output_hidden_size = 3, 8, 11
         layers = [FeedForward(input_hidden_size // 2, 1, output_hidden_size, Activation.by_name('linear')())]
-        bridge = Bridge(layers, share_parameters=True)
+        bridge = Bridge(layers, share_bidirectional_parameters=True)
 
         input_tensor = torch.rand(batch_size, input_hidden_size)
         output_tensor = bridge(input_tensor)
@@ -50,7 +50,7 @@ class TestBridge(unittest.TestCase):
             FeedForward(input_hidden_size // 2, 1, output_hidden_size, Activation.by_name('linear')()),
             FeedForward(input_hidden_size // 2, 1, output_hidden_size, Activation.by_name('linear')())
         ]
-        bridge = Bridge(layers, share_parameters=True)
+        bridge = Bridge(layers, share_bidirectional_parameters=True)
 
         # Pass the same tensor in both positions of the tuple. Then we are able
         # to verify the output tensors are different, which means they went
