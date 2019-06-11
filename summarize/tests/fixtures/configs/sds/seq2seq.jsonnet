@@ -61,6 +61,23 @@ local summary_namespace = "summary_tokens";
       "num_layers": 1,
       "activations": "tanh"
     },
+    "bridge": {
+      "share_parameters": false,
+      "layers": [
+        {
+          "input_dim": 40,
+          "hidden_dims": 40,
+          "num_layers": 1,
+          "activations": "relu"
+        },
+        {
+          "input_dim": 40,
+          "hidden_dims": 40,
+          "num_layers": 1,
+          "activations": "relu"
+        }
+      ]
+    },
     "decoder": {
       "type": "lstm",
       "input_size": 10,

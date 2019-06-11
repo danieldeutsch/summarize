@@ -11,6 +11,7 @@ from overrides import overrides
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from summarize.common.util import SENT_START_SYMBOL, SENT_END_SYMBOL
+from summarize.modules.bridge import Bridge
 from summarize.modules.rnns import RNN
 
 
@@ -38,16 +39,9 @@ class Seq2SeqModel(Model):
         performance and training speed.
     decoder: ``RNN``
         The RNN that will produce the sequence of summary tokens.
-    hidden_projection_layer: ``FeedForward``, optional (default = ``None``)
-        The ``hidden_projection_layer`` is applied to the final encoder hidden
-        state. The output size should be equal to the decoder's hidden size. This
-        is sometimes used to map a bidirectional encoder's hidden state to a single
-        directional decoder's hidden state since the bidirectional encoder's hidden
-        state will be twice the size as the decoder's hidden state. If ``None``,
-        no projection will be used.
-    memory_projection_layer: ``FeedForward``, optional (default = ``None``)
-        The same as ``hidden_projection_layer`` except applied to the memory cell
-        of the RNN if it has memory.
+    bridge: ``Bridge``, optional (default = ``None``)
+        The bridge layer to use in between the encoder final state and the
+        initial decoder hidden state. If ``None``, no layer will be used.
     summary_token_embedder: ``TokenEmbedder``, optional (default = ``None``)
         The ``TokenEmbedder`` that will embed the summary tokens. If ``None``, the
         ``document_token_embedder``'s embedder for the ``"tokens"`` will be used.
@@ -76,8 +70,7 @@ class Seq2SeqModel(Model):
                  attention: MatrixAttention,
                  attention_layer: FeedForward,
                  decoder: RNN,
-                 hidden_projection_layer: Optional[FeedForward] = None,
-                 memory_projection_layer: Optional[FeedForward] = None,
+                 bridge: Bridge,
                  summary_token_embedder: Optional[TokenEmbedder] = None,
                  summary_namespace: str = 'tokens',
                  use_input_feeding: bool = False,
@@ -94,9 +87,8 @@ class Seq2SeqModel(Model):
         self.attention = attention
         self.attention_layer = attention_layer
         self.decoder = decoder
-        self.hidden_projection_layer = hidden_projection_layer
-        self.memory_projection_layer = memory_projection_layer
-        self.summary_token_embedder = summary_token_embedder or document_token_embedder._token_embedders['tokens']
+        self.bridge = bridge
+        self.summary_token_embedder = summary_token_embedder  or document_token_embedder._token_embedders['tokens']
         self.summary_namespace = summary_namespace
         self.use_input_feeding = use_input_feeding
         self.input_feeding_projection_layer = input_feeding_projection_layer
@@ -177,25 +169,22 @@ class Seq2SeqModel(Model):
             # shape: (batch_size, encoder_hidden_size * num_directions)
             hidden = hidden.squeeze(0)
 
-        # Project the encoder hidden state onto the initial decoder hidden state
+        # Apply the bridge layer
+        if self.bridge is not None:
+            # shape: (batch_size, decoder_hidden_size)
+            hidden = self.bridge(hidden)
+
+        # Split the hidden state's tuple items for decoding purposes. The generic
+        # beam search code expects tensors as values in the state dictionary, so
+        # we can't use the default tuple-based implementation. This means we have
+        # to create a ``memory`` tensor even if it's not used (e.g., by a GRU) or
+        # else the reshaping logic of the decoding will fail. However, it will not
+        # be used.
         if self.encoder.has_memory():
             # shape: (batch_size, encoder_hidden_size * num_directions)
             hidden, memory = hidden
         else:
-            # We still create the memory even if the decoder is a GRU because the
-            # beam search code will try to reshape every tensor and it will fail if
-            # it is `None`. However, it won't be used in computation. If this ever
-            # gets changed to be initialized to the encoder's memory, we should also
-            # add its own projection layer.
-            # shape: (batch_size, encoder_hidden_size * num_directions)
             memory = hidden.new_zeros(hidden.size())
-
-        if self.hidden_projection_layer is not None:
-            # shape: (batch_size, decoder_hidden_size)
-            hidden = self.hidden_projection_layer(hidden)
-        if self.memory_projection_layer is not None:
-            # shape: (batch_size, decoder_hidden_size)
-            memory = self.hidden_projection_layer(memory)
 
         return encoder_outputs, document_mask, hidden, memory
 

@@ -11,7 +11,7 @@ from summarize.data.io import JsonlReader
 from summarize.metrics.python_rouge import PythonRouge
 from summarize.training.metrics import PythonRougeMetric
 
-_duc2004_file_path = 'data/duc/duc2004/duc2004.task2.jsonl'
+_duc2004_file_path = 'data/duc/duc2004/task2.jsonl'
 _centroid_file_path = f'{FIXTURES_ROOT}/data/hong2014/centroid.jsonl'
 
 
