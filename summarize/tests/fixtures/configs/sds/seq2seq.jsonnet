@@ -53,16 +53,19 @@ local summary_namespace = "summary_tokens";
       "bidirectional": true
     },
     "attention": {
-      "type": "cosine"
+      "type": "mlp",
+      "encoder_size": 40,
+      "decoder_size": 40,
+      "attention_size": 40
     },
     "attention_layer": {
       "input_dim": 40 + 40,
       "hidden_dims": 40,
       "num_layers": 1,
-      "activations": "tanh"
+      "activations": "linear"
     },
     "bridge": {
-      "share_parameters": false,
+      "share_bidirectional_parameters": false,
       "layers": [
         {
           "input_dim": 40,
