@@ -6,7 +6,7 @@ from allennlp.modules import FeedForward, MatrixAttention, TextFieldEmbedder, To
 from allennlp.nn import InitializerApplicator, RegularizerApplicator
 from allennlp.nn.beam_search import BeamSearch
 from allennlp.nn.util import get_text_field_mask, masked_softmax, weighted_sum
-from allennlp.training.metrics import Metric
+from allennlp.training.metrics import Average, Metric
 from overrides import overrides
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -56,6 +56,10 @@ class Seq2SeqModel(Model):
         run on the concatenated input embedding and context vector. The output will
         be passed as input to the decoder. This is not specified in Luong et al. (2015),
         but it is used in See et al. (2017).
+    loss_normalization: ``str``, optional (default = ``summaries``)
+        Controls how the cross-entropy loss is normalized. The choices are
+        "summaries", which normalized by the number of summaries (the batch size)
+        or "tokens", by the total number of tokens in the batch.
     beam_size: ``int``, optional (default = 1)
         The size of the beam to use for decoding.
     min_output_length: ``int``, optional (default = ``None``)
@@ -75,6 +79,7 @@ class Seq2SeqModel(Model):
                  summary_namespace: str = 'tokens',
                  use_input_feeding: bool = False,
                  input_feeding_projection_layer: Optional[FeedForward] = None,
+                 loss_normalization: str = 'summaries',
                  beam_size: int = 1,
                  min_output_length: Optional[int] = None,
                  max_output_length: Optional[int] = None,
@@ -92,6 +97,7 @@ class Seq2SeqModel(Model):
         self.summary_namespace = summary_namespace
         self.use_input_feeding = use_input_feeding
         self.input_feeding_projection_layer = input_feeding_projection_layer
+        self.loss_normalization = loss_normalization
         # The ``output_layer`` is applied after the attention context and decoder
         # hidden state are combined. It is used to calculate the softmax over the
         # summary vocabulary
@@ -113,11 +119,20 @@ class Seq2SeqModel(Model):
         if SENT_END_SYMBOL in token_to_index:
             self.sent_end_index = token_to_index[SENT_END_SYMBOL]
 
-        self.loss = torch.nn.CrossEntropyLoss(ignore_index=self.pad_index, reduction='mean')
+        self.loss = torch.nn.CrossEntropyLoss(ignore_index=self.pad_index, reduction='sum')
         self.min_output_length = min_output_length
         self.beam_search = BeamSearch(self.end_index, max_steps=max_output_length,
                                       beam_size=beam_size)
+
+        # Define the metrics that will be computed
         self.metrics = metrics
+        # For the token-level cross-entropy, we use an average.
+        # This is technically not the exact cross-entropy because
+        # it's first averaged by the number of tokens in the batch and then the
+        # number of batches instead of the total number tokens. In practice, I don't
+        # think it will matter much.
+        self.cross_entropy_metric = Average()
+
         initializer(self)
 
     def _run_encoder(self, document: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, ...]:
@@ -479,6 +494,8 @@ class Seq2SeqModel(Model):
         -------
         loss: ``torch.Tensor``, ``(1)``
             The loss.
+        cross_entropy: ``torch.Tensor``, ``(1)``
+            The token-level cross-entropy.
         """
         batch_size, num_target_tokens = targets.size()
         # Reshape the inputs to the loss and compute it
@@ -486,8 +503,17 @@ class Seq2SeqModel(Model):
         targets = targets.view(-1)
         # shape: (batch_size * num_target_tokens, summary_vocab_size)
         logits = logits.view(batch_size * num_target_tokens, -1)
-        loss = self.loss(logits, targets)
-        return loss
+        unnormalized_loss = self.loss(logits, targets)
+
+        # Compute the token-level cross-entropy
+        num_targets = (targets != self.pad_index).long().sum()
+        cross_entropy = unnormalized_loss / num_targets
+
+        if self.loss_normalization == 'summaries':
+            loss = unnormalized_loss / batch_size
+        elif self.loss_normalization == 'tokens':
+            loss = cross_entropy
+        return loss, cross_entropy
 
     def _run_inference(self,
                        initial_decoding_state: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
@@ -592,7 +618,9 @@ class Seq2SeqModel(Model):
             # shape: (batch_size, num_summary_tokens - 1, summary_vocab_size)
             # shape: (batch_size, num_summary_tokens - 1, summary_vocab_size)
             logits, targets = self._run_teacher_forcing(initial_decoding_state, summary)
-            output_dict['loss'] = self._compute_loss(logits, targets)
+            loss, cross_entropy = self._compute_loss(logits, targets)
+            output_dict['loss'] = loss
+            self.cross_entropy_metric(cross_entropy.item())
 
         # If we aren't training, then we need to do inference
         if not self.training:
@@ -638,4 +666,5 @@ class Seq2SeqModel(Model):
         metrics = {}
         for metric in self.metrics:
             metrics.update(metric.get_metric(reset))
+        metrics['cross-entropy'] = self.cross_entropy_metric.get_metric(reset)
         return metrics
