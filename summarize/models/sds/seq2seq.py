@@ -4,7 +4,6 @@ from allennlp.data.vocabulary import DEFAULT_PADDING_TOKEN, Vocabulary
 from allennlp.models import Model
 from allennlp.modules import FeedForward, MatrixAttention, TextFieldEmbedder, TokenEmbedder
 from allennlp.nn import InitializerApplicator, RegularizerApplicator
-from allennlp.nn.beam_search import BeamSearch
 from allennlp.nn.util import get_text_field_mask, masked_softmax, weighted_sum
 from allennlp.training.metrics import Average, Metric
 from overrides import overrides
@@ -13,6 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from summarize.common.util import SENT_START_SYMBOL, SENT_END_SYMBOL
 from summarize.modules.bridge import Bridge
 from summarize.modules.rnns import RNN
+from summarize.nn.beam_search import BeamSearch
 
 
 @Model.register('sds-seq2seq')
@@ -120,9 +120,8 @@ class Seq2SeqModel(Model):
             self.sent_end_index = token_to_index[SENT_END_SYMBOL]
 
         self.loss = torch.nn.CrossEntropyLoss(ignore_index=self.pad_index, reduction='sum')
-        self.min_output_length = min_output_length
         self.beam_search = BeamSearch(self.end_index, max_steps=max_output_length,
-                                      beam_size=beam_size)
+                                      beam_size=beam_size, min_steps=min_output_length)
 
         # Define the metrics that will be computed
         self.metrics = metrics
