@@ -39,9 +39,11 @@ class ParagraphWordTokenizer(ParagraphTokenizer):
                  in_between_tokens: List[str] = None):
         self.tokenizer = WordTokenizer(word_splitter=word_splitter,
                                        word_filter=word_filter,
-                                       word_stemmer=word_stemmer,
-                                       start_tokens=start_tokens,
-                                       end_tokens=end_tokens)
+                                       word_stemmer=word_stemmer)
+        self.start_tokens = start_tokens or []
+        self.start_tokens = [Token(token) for token in self.start_tokens]
+        self.end_tokens = end_tokens or []
+        self.end_tokens = [Token(token) for token in self.end_tokens]
         self.in_between_tokens = in_between_tokens or []
         self.in_between_tokens = [Token(token) for token in self.in_between_tokens]
 
@@ -49,11 +51,14 @@ class ParagraphWordTokenizer(ParagraphTokenizer):
     def tokenize(self, texts: List[str]) -> List[Token]:
         tokenized_texts = [self.tokenizer.tokenize(text) for text in texts]
         tokens = []
+        if self.start_tokens:
+            tokens.extend(self.start_tokens)
         for i, tokenized_text in enumerate(tokenized_texts):
             tokens.extend(tokenized_text)
 
             # Add the in-between tokens if this is not the last sentence
             if i != len(tokenized_texts) - 1:
                 tokens.extend(self.in_between_tokens)
-
+        if self.end_tokens:
+            tokens.extend(self.end_tokens)
         return tokens

@@ -21,11 +21,13 @@ class TestParagraphWordTokenizer(unittest.TestCase):
         actual = list(map(str, tokens))
         assert expected == actual
 
-        tokenizer = ParagraphWordTokenizer(in_between_tokens=['</s>', '<s>'])
+        tokenizer = ParagraphWordTokenizer(start_tokens=['@start@'],
+                                           end_tokens=['@end@'],
+                                           in_between_tokens=['</s>', '<s>'])
         expected = [
-            'This', 'is', 'the', 'first', 'sentence', '.', '</s>', '<s>',
+            '@start@', 'This', 'is', 'the', 'first', 'sentence', '.', '</s>', '<s>',
             'Followed', 'by', 'the', 'second', '.', '</s>', '<s>',
-            'And', 'the', 'third', '!'
+            'And', 'the', 'third', '!', '@end@'
         ]
         tokens = tokenizer.tokenize(texts)
         actual = list(map(str, tokens))
