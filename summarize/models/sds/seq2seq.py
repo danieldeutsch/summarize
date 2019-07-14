@@ -270,7 +270,8 @@ class Seq2SeqModel(Model):
         # Since this method is written generically for processing multiple time steps
         # in the same call and for implementing the AllenNLP beam search interface,
         # we add a dimension to the input tokens if there is no dimension for the time step.
-        if summary_tokens.dim() == 1:
+        is_inference = summary_tokens.dim() == 1
+        if is_inference:
             # shape: (group_size, 1)
             summary_tokens = summary_tokens.unsqueeze(-1)
         group_size, num_summary_tokens = summary_tokens.size()
@@ -353,10 +354,13 @@ class Seq2SeqModel(Model):
         # shape: (group_size, num_summary_tokens, summary_vocab_size)
         logits = self.output_layer(decoder_outputs)
 
-        # Reshape the logits if there was only 1 summary token. This is typically
-        # because it's being called from `BeamSearch`
-        if num_summary_tokens == 1:
-            logits = logits.squeeze(1)
+        # If we are running inference, the BeamSearch interface expects the log-probabilities,
+        # not the logits. Additionally, the tensor needs to be rehaped
+        if is_inference:
+            # shape: (group_size, summary_vocab_size)
+            output_scores = torch.log_softmax(logits, dim=2).squeeze(1)
+        else:
+            output_scores = logits
 
         # Update the state dictionary
         output_state = dict(state)
@@ -364,7 +368,7 @@ class Seq2SeqModel(Model):
         output_state['memory'] = memory
         output_state['input_feed'] = input_feed
 
-        return logits, output_state
+        return output_scores, output_state
 
     def _apply_input_feeding(self,
                              embedding: torch.Tensor,
