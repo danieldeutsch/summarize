@@ -31,6 +31,12 @@ local summary_namespace = "summary_tokens";
   },
   "train_data_path": "summarize/tests/fixtures/data/sds.jsonl",
   "validation_data_path": "summarize/tests/fixtures/data/sds.jsonl",
+  "vocabulary": {
+    "tokens_to_add": {
+      // Using the summary_namespace variable as the key does not work
+      "summary_tokens": ["@start@", "@end@"]
+    }
+  },
   "model": {
     "type": "sds-seq2seq",
     "summary_namespace": summary_namespace,
