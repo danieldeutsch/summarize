@@ -33,6 +33,15 @@ infinite_transition_probabilities = torch.tensor(
          [0.0, 0.0, 0.0, 0.0, 0.0, 1.0]]  # end token -> jth token
 )
 
+linear_chain_transition_probabilities = torch.tensor(
+        [[0.0, 0.9, 0.1, 0.0, 0.0, 0.0],  # start token -> jth token
+         [0.0, 0.9, 0.1, 0.0, 0.0, 0.0],  # 1st token -> jth token
+         [0.0, 0.0, 0.9, 0.1, 0.0, 0.0],  # 2nd token -> jth token
+         [0.0, 0.0, 0.0, 0.9, 0.1, 0.0],  # ...
+         [0.0, 0.0, 0.0, 0.0, 0.9, 0.1],  # ...
+         [0.0, 0.0, 0.0, 0.0, 0.0, 1.0]]  # end token -> jth token
+)
+
 
 def take_step(last_predictions: torch.Tensor,
               state: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
@@ -60,6 +69,16 @@ def take_infinite_step(last_predictions: torch.Tensor,
     log_probs_list = []
     for last_token in last_predictions:
         log_probs = torch.log(infinite_transition_probabilities[last_token.item()])
+        log_probs_list.append(log_probs)
+
+    return torch.stack(log_probs_list), state
+
+
+def take_linear_chain_step(last_predictions: torch.Tensor,
+                           state: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+    log_probs_list = []
+    for last_token in last_predictions:
+        log_probs = torch.log(linear_chain_transition_probabilities[last_token.item()])
         log_probs_list.append(log_probs)
 
     return torch.stack(log_probs_list), state
@@ -96,7 +115,8 @@ class BeamSearchTest(AllenNlpTestCase):
                        expected_log_probs: np.array = None,
                        beam_search: BeamSearch = None,
                        state: Dict[str, torch.Tensor] = None,
-                       step: StepFunctionType = None) -> None:
+                       step: StepFunctionType = None,
+                       rtol: float = 1e-7) -> None:
         expected_top_k = expected_top_k if expected_top_k is not None else self.expected_top_k
         expected_log_probs = expected_log_probs if expected_log_probs is not None else self.expected_log_probs
         state = state or {}
@@ -114,7 +134,7 @@ class BeamSearchTest(AllenNlpTestCase):
 
         # log_probs should be shape `(batch_size, beam_size, max_predicted_length)`.
         assert list(log_probs.size()) == [batch_size, beam_size]
-        np.testing.assert_allclose(log_probs[0].numpy(), expected_log_probs)
+        np.testing.assert_allclose(log_probs[0].numpy(), expected_log_probs, rtol=rtol)
 
     def test_search(self):
         self._check_results()
@@ -257,3 +277,99 @@ class BeamSearchTest(AllenNlpTestCase):
         beam_search = BeamSearch(self.vocab, beam_size=1, end_symbol=self.end_symbol, min_steps=5)
         with pytest.warns(RuntimeWarning, match="Infinite log probabilities"):
             beam_search.search(initial_predictions, {}, take_step)
+
+    def test_disallow_repeated_ngrams(self):
+        # Make sure the unconstrained search returns what's expected
+        beam_search = BeamSearch(self.vocab, beam_size=2, max_steps=10, end_symbol=self.end_symbol)
+        expected_top_k = np.array([[1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+                                   [2, 2, 2, 2, 2, 2, 2, 2, 2, 2]])
+        expected_log_probs = np.log(np.array([0.9 ** 10,
+                                              0.1 ** 1 * 0.9 ** 9]))
+        self._check_results(expected_top_k=expected_top_k,
+                            expected_log_probs=expected_log_probs,
+                            beam_search=beam_search,
+                            step=take_linear_chain_step,
+                            rtol=1e-5)
+
+        # Prevent repeat unigrams
+        beam_search = BeamSearch(self.vocab, beam_size=2, max_steps=10, end_symbol=self.end_symbol,
+                                 disallow_repeated_ngrams=1)
+        expected_top_k = np.array([[2, 3, 4, 5, 5],
+                                   [1, 2, 3, 4, 5]])
+        expected_log_probs = np.log(np.array([0.1 ** 4,
+                                              0.9 * 0.1 ** 4]))
+        self._check_results(expected_top_k=expected_top_k,
+                            expected_log_probs=expected_log_probs,
+                            beam_search=beam_search,
+                            step=take_linear_chain_step)
+
+        # Prevent repeat unigrams except "3"
+        beam_search = BeamSearch(self.vocab, beam_size=2, max_steps=10, end_symbol=self.end_symbol,
+                                 disallow_repeated_ngrams=1, repeated_ngrams_exceptions=[["3"]])
+        expected_top_k = np.array([[1, 2, 3, 3, 3, 3, 3, 3, 3, 3],
+                                   [2, 3, 3, 3, 3, 3, 3, 3, 3, 3]])
+        expected_log_probs = np.log(np.array([0.1 ** 2 * 0.9 ** 8,
+                                              0.1 ** 2 * 0.9 ** 8]))
+        self._check_results(expected_top_k=expected_top_k,
+                            expected_log_probs=expected_log_probs,
+                            beam_search=beam_search,
+                            step=take_linear_chain_step)
+
+        # Prevent repeat bigrams
+        beam_search = BeamSearch(self.vocab, beam_size=2, max_steps=10, end_symbol=self.end_symbol,
+                                 disallow_repeated_ngrams=2)
+        expected_top_k = np.array([[2, 2, 3, 3, 4, 4, 5, 5, 5],
+                                   [1, 1, 2, 2, 3, 3, 4, 4, 5]])
+        expected_log_probs = np.log(np.array([0.1 ** 4 * 0.9 ** 3,
+                                              0.1 ** 4 * 0.9 ** 5]))
+        self._check_results(expected_top_k=expected_top_k,
+                            expected_log_probs=expected_log_probs,
+                            beam_search=beam_search,
+                            step=take_linear_chain_step)
+
+        # Prevent repeat bigrams except "3 3"
+        beam_search = BeamSearch(self.vocab, beam_size=2, max_steps=10, end_symbol=self.end_symbol,
+                                 disallow_repeated_ngrams=2, repeated_ngrams_exceptions=[["3", "3"]])
+        expected_top_k = np.array([[1, 1, 2, 2, 3, 3, 3, 3, 3, 3],
+                                   [2, 2, 3, 3, 3, 3, 3, 3, 3, 3]])
+        expected_log_probs = np.log(np.array([0.1 ** 2 * 0.9 ** 8,
+                                              0.1 ** 2 * 0.9 ** 8]))
+        self._check_results(expected_top_k=expected_top_k,
+                            expected_log_probs=expected_log_probs,
+                            beam_search=beam_search,
+                            step=take_linear_chain_step)
+
+        # Prevent repeat trigrams
+        beam_search = BeamSearch(self.vocab, beam_size=2, max_steps=10, end_symbol=self.end_symbol,
+                                 disallow_repeated_ngrams=3)
+        expected_top_k = np.array([[1, 1, 1, 2, 2, 2, 3, 3, 3, 4],
+                                   [2, 2, 2, 3, 3, 3, 4, 4, 4, 5]])
+        expected_log_probs = np.log(np.array([0.1 ** 3 * 0.9 ** 7,
+                                              0.1 ** 4 * 0.9 ** 6]))
+        self._check_results(expected_top_k=expected_top_k,
+                            expected_log_probs=expected_log_probs,
+                            beam_search=beam_search,
+                            step=take_linear_chain_step)
+
+        # Prevent repeat trigrams except "3 3 3"
+        beam_search = BeamSearch(self.vocab, beam_size=2, max_steps=10, end_symbol=self.end_symbol,
+                                 disallow_repeated_ngrams=3, repeated_ngrams_exceptions=[["3", "3", "3"]])
+        expected_top_k = np.array([[1, 1, 1, 2, 2, 2, 3, 3, 3, 3],
+                                   [2, 2, 2, 3, 3, 3, 3, 3, 3, 3]])
+        expected_log_probs = np.log(np.array([0.1 ** 2 * 0.9 ** 8,
+                                              0.1 ** 2 * 0.9 ** 8]))
+        self._check_results(expected_top_k=expected_top_k,
+                            expected_log_probs=expected_log_probs,
+                            beam_search=beam_search,
+                            step=take_linear_chain_step)
+
+    def test_disallow_repeated_ngrams_errors(self):
+        # Inconsistent disallowed length and exception length
+        with pytest.raises(Exception):
+            BeamSearch(self.vocab, beam_size=2, max_steps=10, end_symbol=self.end_symbol,
+                       disallow_repeated_ngrams=2, repeated_ngrams_exceptions=[["3", "3", "3"]])
+
+        # Token not present in vocabulary
+        with pytest.raises(Exception):
+            BeamSearch(self.vocab, beam_size=2, max_steps=10, end_symbol=self.end_symbol,
+                       disallow_repeated_ngrams=2, repeated_ngrams_exceptions=[["A", "3"]])
