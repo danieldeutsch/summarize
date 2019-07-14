@@ -104,6 +104,7 @@ local summary_namespace = "summary_tokens";
       "beam_size": 5,
       "min_steps": 5,
       "max_steps": 10,
+      "disallow_repeated_ngrams": 1
     },
     "metrics": [
       {
