@@ -17,13 +17,18 @@ class BeamSearch(FromParams):
 
     Parameters
     ----------
-    end_index : ``int``
-        The index of the "stop" or "end" token in the target vocabulary.
+    beam_size : ``int``
+        The width of the beam used.
+    namespace : ``str``, optional (default = ``tokens``)
+        The vocabulary namespace of the output symbols.
+    end_symbol : ``str``, optional (default = ``END_SYMBOL``)
+        The symbol of the "stop" or "end" token in the target vocabulary.
+    min_steps : ``int``, optional (default = ``None``)
+        The minimum number of decoding steps to take, i.e. the minimum length
+        of the predicted sequences. No minimum is enforced if ``None``
     max_steps : ``int``, optional (default = 50)
         The maximum number of decoding steps to take, i.e. the maximum length
         of the predicted sequences.
-    beam_size : ``int``, optional (default = 10)
-        The width of the beam used.
     per_node_beam_size : ``int``, optional (default = beam_size)
         The maximum number of candidates to consider per node, at each step in the search.
         If not given, this just defaults to ``beam_size``. Setting this parameter
