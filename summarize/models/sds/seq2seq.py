@@ -75,14 +75,12 @@ class Seq2SeqModel(Model):
                  attention_layer: FeedForward,
                  decoder: RNN,
                  bridge: Bridge,
+                 beam_search: BeamSearch,
                  summary_token_embedder: Optional[TokenEmbedder] = None,
                  summary_namespace: str = 'tokens',
                  use_input_feeding: bool = False,
                  input_feeding_projection_layer: Optional[FeedForward] = None,
                  loss_normalization: str = 'summaries',
-                 beam_size: int = 1,
-                 min_output_length: Optional[int] = None,
-                 max_output_length: Optional[int] = None,
                  metrics: Optional[List[Metric]] = None,
                  initializer: InitializerApplicator = InitializerApplicator(),
                  regularizer: RegularizerApplicator = None) -> None:
@@ -93,6 +91,7 @@ class Seq2SeqModel(Model):
         self.attention_layer = attention_layer
         self.decoder = decoder
         self.bridge = bridge
+        self.beam_search = beam_search
         self.summary_token_embedder = summary_token_embedder or document_token_embedder._token_embedders['tokens']
         self.summary_namespace = summary_namespace
         self.use_input_feeding = use_input_feeding
@@ -120,8 +119,6 @@ class Seq2SeqModel(Model):
             self.sent_end_index = token_to_index[SENT_END_SYMBOL]
 
         self.loss = torch.nn.CrossEntropyLoss(ignore_index=self.pad_index, reduction='sum')
-        self.beam_search = BeamSearch(self.end_index, max_steps=max_output_length,
-                                      beam_size=beam_size, min_steps=min_output_length)
 
         # Define the metrics that will be computed
         self.metrics = metrics

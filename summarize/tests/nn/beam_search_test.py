@@ -8,6 +8,7 @@ import torch
 
 from allennlp.common.checks import ConfigurationError
 from allennlp.common.testing import AllenNlpTestCase
+from allennlp.data import Vocabulary
 
 from summarize.nn.beam_search import BeamSearch, StepFunctionType
 
@@ -69,8 +70,15 @@ class BeamSearchTest(AllenNlpTestCase):
 
     def setUp(self):
         super(BeamSearchTest, self).setUp()
+        self.vocab = Vocabulary(non_padded_namespaces=['tokens'])
+        for i in range(transition_probabilities.size(0)):
+            self.vocab.add_token_to_namespace(str(i))
+        self.end_symbol = str(transition_probabilities.size()[0] - 1)
         self.end_index = transition_probabilities.size()[0] - 1
-        self.beam_search = BeamSearch(self.end_index, max_steps=10, beam_size=3)
+        # Ensure the end symbol has the expected index
+        assert self.end_index == self.vocab.get_token_index(self.end_symbol)
+        self.beam_search = BeamSearch(self.vocab, beam_size=3, end_symbol=self.end_symbol,
+                                      max_steps=10)
 
         # This is what the top k should look like for each item in the batch.
         self.expected_top_k = np.array(
@@ -152,7 +160,7 @@ class BeamSearchTest(AllenNlpTestCase):
         self._check_results(batch_size=1)
 
     def test_greedy_search(self):
-        beam_search = BeamSearch(self.end_index, beam_size=1)
+        beam_search = BeamSearch(self.vocab, beam_size=1, end_symbol=self.end_symbol)
         expected_top_k = np.array([[1, 2, 3, 4, 5]])
         expected_log_probs = np.log(np.array([0.4]))  # pylint: disable=assignment-from-no-return
         self._check_results(expected_top_k=expected_top_k,
@@ -163,7 +171,7 @@ class BeamSearchTest(AllenNlpTestCase):
         """
         Checks case where beam search will reach `max_steps` before finding end tokens.
         """
-        beam_search = BeamSearch(self.end_index, beam_size=3, max_steps=3)
+        beam_search = BeamSearch(self.vocab, beam_size=3, end_symbol=self.end_symbol, max_steps=3)
         expected_top_k = np.array(
                 [[1, 2, 3],
                  [2, 3, 4],
@@ -176,11 +184,11 @@ class BeamSearchTest(AllenNlpTestCase):
 
     def test_different_per_node_beam_size(self):
         # per_node_beam_size = 1
-        beam_search = BeamSearch(self.end_index, beam_size=3, per_node_beam_size=1)
+        beam_search = BeamSearch(self.vocab, beam_size=3, end_symbol=self.end_symbol, per_node_beam_size=1)
         self._check_results(beam_search=beam_search)
 
         # per_node_beam_size = 2
-        beam_search = BeamSearch(self.end_index, beam_size=3, per_node_beam_size=2)
+        beam_search = BeamSearch(self.vocab, beam_size=3, end_symbol=self.end_symbol, per_node_beam_size=2)
         self._check_results(beam_search=beam_search)
 
     def test_catch_bad_config(self):
@@ -189,7 +197,7 @@ class BeamSearchTest(AllenNlpTestCase):
         the size of the target vocabulary, `BeamSearch.search` should raise
         a ConfigurationError.
         """
-        beam_search = BeamSearch(self.end_index, beam_size=20)
+        beam_search = BeamSearch(self.vocab, beam_size=20, end_symbol=self.end_symbol)
         with pytest.raises(ConfigurationError):
             self._check_results(beam_search=beam_search)
 
@@ -204,7 +212,7 @@ class BeamSearchTest(AllenNlpTestCase):
 
     def test_empty_sequences(self):
         initial_predictions = torch.LongTensor([self.end_index-1, self.end_index-1])
-        beam_search = BeamSearch(self.end_index, beam_size=1)
+        beam_search = BeamSearch(self.vocab, beam_size=1, end_symbol=self.end_symbol)
         with pytest.warns(RuntimeWarning, match="Empty sequences predicted"):
             predictions, log_probs = beam_search.search(initial_predictions, {}, take_step)
         # predictions hould have shape `(batch_size, beam_size, max_predicted_length)`.
@@ -216,7 +224,7 @@ class BeamSearchTest(AllenNlpTestCase):
 
     def test_min_steps(self):
         # Ensure without a minimum length that the end token is directly emitted.
-        beam_search = BeamSearch(self.end_index, beam_size=1)
+        beam_search = BeamSearch(self.vocab, beam_size=1, end_symbol=self.end_symbol)
         expected_top_k = np.array([[5]])
         expected_log_probs = np.log(np.array([0.9], dtype=np.float32))  # pylint: disable=assignment-from-no-return
         with pytest.warns(RuntimeWarning, match="Empty sequences predicted"):
@@ -227,7 +235,7 @@ class BeamSearchTest(AllenNlpTestCase):
 
         # Test min_steps = 1, which will not force the search code into
         # the for loop
-        beam_search = BeamSearch(self.end_index, beam_size=1, min_steps=1)
+        beam_search = BeamSearch(self.vocab, beam_size=1, end_symbol=self.end_symbol, min_steps=1)
         expected_top_k = np.array([[4, 5]])
         expected_log_probs = np.log(np.array([0.09]))  # pylint: disable=assignment-from-no-return
         self._check_results(expected_top_k=expected_top_k,
@@ -236,7 +244,7 @@ class BeamSearchTest(AllenNlpTestCase):
                             step=take_infinite_step)
 
         # Test min_steps > 1, so the for loop code will run
-        beam_search = BeamSearch(self.end_index, beam_size=1, min_steps=3)
+        beam_search = BeamSearch(self.vocab, beam_size=1, end_symbol=self.end_symbol, min_steps=3)
         expected_top_k = np.array([[4, 4, 4, 5]])
         expected_log_probs = np.log(np.array([0.0009]))  # pylint: disable=assignment-from-no-return
         self._check_results(expected_top_k=expected_top_k,
@@ -246,6 +254,6 @@ class BeamSearchTest(AllenNlpTestCase):
 
     def test_min_steps_warn_for_bad_log_probs(self):
         initial_predictions = torch.LongTensor([0] * 2)
-        beam_search = BeamSearch(self.end_index, beam_size=1, min_steps=5)
+        beam_search = BeamSearch(self.vocab, beam_size=1, end_symbol=self.end_symbol, min_steps=5)
         with pytest.warns(RuntimeWarning, match="Infinite log probabilities"):
             beam_search.search(initial_predictions, {}, take_step)

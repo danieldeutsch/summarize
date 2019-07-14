@@ -99,9 +99,12 @@ local summary_namespace = "summary_tokens";
       "num_layers": 1,
       "activations": "linear"
     },
-    "beam_size": 5,
-    "min_output_length": 5,
-    "max_output_length": 10,
+    "beam_search": {
+      "namespace": summary_namespace,
+      "beam_size": 5,
+      "min_steps": 5,
+      "max_steps": 10,
+    },
     "metrics": [
       {
         "type": "python-rouge",

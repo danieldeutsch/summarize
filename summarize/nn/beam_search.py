@@ -1,16 +1,17 @@
-from typing import List, Callable, Tuple, Dict
-import warnings
-
 import torch
-
+import warnings
+from allennlp.common import FromParams
 from allennlp.common.checks import ConfigurationError
+from allennlp.common.util import END_SYMBOL
+from allennlp.data import Vocabulary
+from typing import Callable, Dict, List, Tuple
 
 
 StateType = Dict[str, torch.Tensor]  # pylint: disable=invalid-name
 StepFunctionType = Callable[[torch.Tensor, StateType], Tuple[torch.Tensor, StateType]]  # pylint: disable=invalid-name
 
 
-class BeamSearch:
+class BeamSearch(FromParams):
     """
     Implements the beam search algorithm for decoding the most likely sequences.
 
@@ -32,16 +33,19 @@ class BeamSearch:
     """
 
     def __init__(self,
-                 end_index: int,
+                 vocab: Vocabulary,
+                 beam_size: int,
+                 namespace: str = 'tokens',
+                 end_symbol: str = None,
+                 min_steps: int = None,
                  max_steps: int = 50,
-                 beam_size: int = 10,
-                 per_node_beam_size: int = None,
-                 min_steps: int = None) -> None:
-        self._end_index = end_index
-        self.max_steps = max_steps
+                 per_node_beam_size: int = None) -> None:
         self.beam_size = beam_size
-        self.per_node_beam_size = per_node_beam_size or beam_size
+        end_symbol = end_symbol or END_SYMBOL
+        self._end_index = vocab.get_token_index(end_symbol, namespace)
+        self.max_steps = max_steps
         self.min_steps = min_steps
+        self.per_node_beam_size = per_node_beam_size or beam_size
 
     def search(self,
                start_predictions: torch.Tensor,
