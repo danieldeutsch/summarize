@@ -83,22 +83,22 @@ The tokenized files can be downloaded from AWS here:
     </thead>
     <tbody>
       <tr>
-        <th>CNN</t>
-        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn/train.tokenized.v1.0.jsonl.gz</t>
-        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn/valid.tokenized.v1.0.jsonl.gz</t>
-        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn/test.tokenized.v1.0.jsonl.gz</t>
+        <td>CNN</td>
+        <td>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn/train.tokenized.v1.0.jsonl.gz</td>
+        <td>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn/valid.tokenized.v1.0.jsonl.gz</td>
+        <td>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn/test.tokenized.v1.0.jsonl.gz</td>
       </tr>
       <tr>
-        <th>DailyMail</t>
-        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/dailymail/train.tokenized.v1.0.jsonl.gz</t>
-        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/dailymail/valid.tokenized.v1.0.jsonl.gz</t>
-        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/dailymail/test.tokenized.v1.0.jsonl.gz</t>
+        <td>DailyMail</td>
+        <td>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/dailymail/train.tokenized.v1.0.jsonl.gz</td>
+        <td>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/dailymail/valid.tokenized.v1.0.jsonl.gz</td>
+        <td>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/dailymail/test.tokenized.v1.0.jsonl.gz</td>
       </tr>
       <tr>
-        <th>CNN/DailyMail</t>
-        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/train.tokenized.v1.0.jsonl.gz</t>
-        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/valid.tokenized.v1.0.jsonl.gz</t>
-        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/test.tokenized.v1.0.jsonl.gz</t>
+        <td>CNN/DailyMail</td>
+        <td>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/train.tokenized.v1.0.jsonl.gz</td>
+        <td>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/valid.tokenized.v1.0.jsonl.gz</td>
+        <td>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/test.tokenized.v1.0.jsonl.gz</td>
       </tr>
     </tbody>
   </table>
