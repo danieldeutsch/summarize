@@ -42,6 +42,8 @@ class Seq2SeqModel(Model):
     bridge: ``Bridge``, optional (default = ``None``)
         The bridge layer to use in between the encoder final state and the
         initial decoder hidden state. If ``None``, no layer will be used.
+    beam_search: ``BeamSearch``
+        The ``BeamSearch`` object to use for inference.
     summary_token_embedder: ``TokenEmbedder``, optional (default = ``None``)
         The ``TokenEmbedder`` that will embed the summary tokens. If ``None``, the
         ``document_token_embedder``'s embedder for the ``"tokens"`` will be used.
@@ -60,12 +62,6 @@ class Seq2SeqModel(Model):
         Controls how the cross-entropy loss is normalized. The choices are
         "summaries", which normalized by the number of summaries (the batch size)
         or "tokens", by the total number of tokens in the batch.
-    beam_size: ``int``, optional (default = 1)
-        The size of the beam to use for decoding.
-    min_output_length: ``int``, optional (default = ``None``)
-        The minimum possible summary output length, unrestricted if ``None``.
-    max_output_length: ``int``, optional (default = ``None``)
-        The maximum possible summary output length, unrestricted if ``None``.
     """
     def __init__(self,
                  vocab: Vocabulary,
