@@ -29,22 +29,22 @@ The files can be downloaded from AWS here:
     </thead>
     <tbody>
       <tr>
-        <th>CNN</t>
-        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn/train.v1.0.jsonl.gz</t>
-        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn/valid.v1.0.jsonl.gz</t>
-        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn/test.v1.0.jsonl.gz</t>
+        <td>CNN</td>
+        <td>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn/train.v1.0.jsonl.gz</td>
+        <td>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn/valid.v1.0.jsonl.gz</td>
+        <td>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn/test.v1.0.jsonl.gz</td>
       </tr>
       <tr>
-        <th>DailyMail</t>
-        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/dailymail/train.v1.0.jsonl.gz</t>
-        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/dailymail/valid.v1.0.jsonl.gz</t>
-        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/dailymail/test.v1.0.jsonl.gz</t>
+        <td>DailyMail</d>
+        <td>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/dailymail/train.v1.0.jsonl.gz</td>
+        <td>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/dailymail/valid.v1.0.jsonl.gz</td>
+        <td>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/dailymail/test.v1.0.jsonl.gz</td>
       </tr>
       <tr>
-        <th>CNN/DailyMail</t>
-        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/train.v1.0.jsonl.gz</t>
-        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/valid.v1.0.jsonl.gz</t>
-        <th>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/test.v1.0.jsonl.gz</t>
+        <td>CNN/DailyMail</td>
+        <td>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/train.v1.0.jsonl.gz</td>
+        <td>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/valid.v1.0.jsonl.gz</td>
+        <td>https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/test.v1.0.jsonl.gz</td>
       </tr>
     </tbody>
   </table>
