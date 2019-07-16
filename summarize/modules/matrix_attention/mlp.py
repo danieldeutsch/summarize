@@ -41,20 +41,27 @@ class MLPAttention(MatrixAttention):
 
         Returns
         -------
-        A ``(batch_size, num_summary_tokens, num_decoder_tokens)``-sized tensor with the
+        A ``(batch_size, num_summary_tokens, num_document_tokens)``-sized tensor with the
             unnormalized attention scores.
         """
         num_decoder_tokens = decoder_outputs.size(1)
         num_encoder_tokens = encoder_outputs.size(1)
 
+        # shape: (batch_size, num_summary_tokens, 1, decoder_size)
         decoder_outputs = decoder_outputs.unsqueeze(2)
+        # shape: (batch_size, 1, num_document_tokens, encoder_size)
         encoder_outputs = encoder_outputs.unsqueeze(1)
 
+        # shape: (batch_size, num_summary_tokens, 1, attention_size)
         decoder_projection = self.linear_query(decoder_outputs)
+        # shape: (batch_size, 1, num_document_tokens, attention_size)
         encoder_projection = self.linear_context(encoder_outputs)
 
+        # shape: (batch_size, num_summary_tokens, num_document_tokens, attention_size)
         decoder_projection = decoder_projection.expand(-1, -1, num_encoder_tokens, -1)
+        # shape: (batch_size, num_summary_tokens, num_document_tokens, attention_size)
         encoder_projection = encoder_projection.expand(-1, num_decoder_tokens, -1, -1)
 
+        # shape: (batch_size, num_summary_tokens, num_document_tokens)
         affinities = self.v(torch.tanh(decoder_projection + encoder_projection)).squeeze(-1)
         return affinities
