@@ -11,6 +11,7 @@ from allennlp.common.testing import AllenNlpTestCase
 from allennlp.data import Vocabulary
 
 from summarize.nn.beam_search import BeamSearch, StepFunctionType
+from summarize.nn.length_penalizers import WuLengthPenalizer
 
 
 transition_probabilities = torch.tensor(  # pylint: disable=not-callable
@@ -373,3 +374,21 @@ class BeamSearchTest(AllenNlpTestCase):
         with pytest.raises(Exception):
             BeamSearch(self.vocab, beam_size=2, max_steps=10, end_symbol=self.end_symbol,
                        disallow_repeated_ngrams=2, repeated_ngrams_exceptions=[["A", "3"]])
+
+    def test_length_penalizer(self):
+        # This is an extreme value for the Wu penalizer just to force
+        # the outputs to switch order
+        length_penalizer = WuLengthPenalizer(-10)
+        beam_search = BeamSearch(self.vocab, beam_size=3, end_symbol=self.end_symbol,
+                                 max_steps=10, length_penalizer=length_penalizer)
+        # The outputs are in the opposite order than expected
+        expected_top_k = np.array(
+                [[3, 4, 5, 5, 5],
+                 [2, 3, 4, 5, 5],
+                 [1, 2, 3, 4, 5]]
+        )
+        expected_log_probs = np.log(np.array([0.2, 0.3, 0.4]))
+        self._check_results(expected_top_k=expected_top_k,
+                            expected_log_probs=expected_log_probs,
+                            beam_search=beam_search,
+                            step=take_step)

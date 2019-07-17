@@ -7,6 +7,8 @@ from allennlp.data import Vocabulary
 from collections import defaultdict
 from typing import Callable, Dict, List, Tuple
 
+from summarize.nn.length_penalizers import LengthPenalizer
+
 
 StateType = Dict[str, torch.Tensor]  # pylint: disable=invalid-name
 StepFunctionType = Callable[[torch.Tensor, StateType], Tuple[torch.Tensor, StateType]]  # pylint: disable=invalid-name
@@ -26,7 +28,8 @@ class BeamSearch(FromParams):
         The symbol of the "stop" or "end" token in the target vocabulary.
     min_steps : ``int``, optional (default = ``None``)
         The minimum number of decoding steps to take, i.e. the minimum length
-        of the predicted sequences. No minimum is enforced if ``None``
+        of the predicted sequences. This does not include the start or end tokens.
+        No minimum is enforced if ``None``
     max_steps : ``int``, optional (default = 50)
         The maximum number of decoding steps to take, i.e. the maximum length
         of the predicted sequences.
@@ -41,6 +44,9 @@ class BeamSearch(FromParams):
         can be repeated.
     repeated_ngrams_exceptions: ``List[List[str]]``, optional (default = ``None``)
         A list of n-grams which are exceptions to the disallowed rules.
+    length_penalizer: ``LengthPenalizer``, optional (default = ``None``)
+        The length penalizer that should be used to rerank the candidate summaries
+        after beam search has finished.
     """
     def __init__(self,
                  vocab: Vocabulary,
@@ -51,13 +57,15 @@ class BeamSearch(FromParams):
                  max_steps: int = 50,
                  per_node_beam_size: int = None,
                  disallow_repeated_ngrams: int = None,
-                 repeated_ngrams_exceptions: List[List[str]] = None) -> None:
+                 repeated_ngrams_exceptions: List[List[str]] = None,
+                 length_penalizer: LengthPenalizer = None) -> None:
         self.beam_size = beam_size
         end_symbol = end_symbol or END_SYMBOL
         self._end_index = vocab.get_token_index(end_symbol, namespace)
         self.max_steps = max_steps
         self.min_steps = min_steps
         self.per_node_beam_size = per_node_beam_size or beam_size
+        self.length_penalizer = length_penalizer
 
         # Convert the ngram exceptions to tuples of the corresponding indices
         self.disallow_repeated_ngrams = disallow_repeated_ngrams
@@ -168,7 +176,10 @@ class BeamSearch(FromParams):
         Tuple[torch.Tensor, torch.Tensor]
             Tuple of ``(predictions, log_probabilities)``, where ``predictions``
             has shape ``(batch_size, beam_size, max_steps)`` and ``log_probabilities``
-            has shape ``(batch_size, beam_size)``.
+            has shape ``(batch_size, beam_size)``. The beam position is the order
+            of the "best" predictions according to the search (regardless of the
+            order of the log-probabilities) because the output order takes into
+            account the length penalty.
         """
         batch_size = start_predictions.size()[0]
 
@@ -243,9 +254,16 @@ class BeamSearch(FromParams):
                     expand(batch_size, self.beam_size, *last_dims).\
                     reshape(batch_size * self.beam_size, *last_dims)
 
+        # Maintains the length of each prediction, not including the start
+        # or end token
+        lengths = start_class_log_probabilities.new_zeros(batch_size * self.beam_size, dtype=torch.long)
+
         for timestep in range(self.max_steps - 1):
             # shape: (batch_size * beam_size,)
             last_predictions = predictions[-1].reshape(batch_size * self.beam_size)
+
+            # If the last token was not the end index, we increment the length by 1
+            lengths += (last_predictions != self._end_index).long()
 
             # If every predicted token from the last step is `self._end_index`,
             # then we can stop early.
@@ -348,6 +366,11 @@ class BeamSearch(FromParams):
                         gather(1, expanded_backpointer).\
                         reshape(batch_size * self.beam_size, *last_dims)
 
+        # Update the length one last time if the last token was not the end, then reshape
+        lengths += (predictions[-1].reshape(batch_size * self.beam_size) != self._end_index).long()
+        # shape: (batch_size, beam_size)
+        lengths = lengths.view(batch_size, self.beam_size)
+
         if not torch.isfinite(last_log_probabilities).all():
             warnings.warn("Infinite log probabilities encountered. Some final sequences may not make sense. "
                           "This can happen when the beam size is larger than the number of valid (non-zero "
@@ -378,5 +401,21 @@ class BeamSearch(FromParams):
 
         # shape: (batch_size, beam_size, max_steps)
         all_predictions = torch.cat(list(reversed(reconstructed_predictions)), 2)
+
+        # Use the length penalizer to rerank the predictions if one is provided
+        if self.length_penalizer is not None:
+            # shape: (batch_size, beam_size)
+            length_penalties = self.length_penalizer(lengths)
+            # shape: (batch_size, beam_size)
+            penalized_scores = last_log_probabilities / length_penalties
+            # Sort the new scores in descending order
+            # shape: (batch_size, beam_size)
+            sorted_indices = torch.argsort(penalized_scores, dim=1, descending=True)
+
+            # Reorder the probabilities
+            last_log_probabilities = torch.gather(last_log_probabilities, 1, sorted_indices)
+            # Reorder the predictions
+            sorted_indices = sorted_indices.unsqueeze(2).expand_as(all_predictions)
+            all_predictions = torch.gather(all_predictions, 1, sorted_indices)
 
         return all_predictions, last_log_probabilities
