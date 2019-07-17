@@ -5,7 +5,7 @@ from summarize.nn.length_penalizers import AverageLengthPenalizer
 
 
 class TestAverageLengthPenalizer(unittest.TestCase):
-    def test_wu_length_penalizer(self):
+    def test_average_length_penalizer(self):
         lengths = torch.LongTensor([[1, 2], [3, 4]])
 
         penalizer = AverageLengthPenalizer()
