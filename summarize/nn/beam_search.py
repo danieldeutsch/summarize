@@ -1,3 +1,4 @@
+import copy
 import torch
 import warnings
 from allennlp.common import FromParams
@@ -7,6 +8,7 @@ from allennlp.data import Vocabulary
 from collections import defaultdict
 from typing import Callable, Dict, List, Tuple
 
+from summarize.nn.coverage_penalizers import CoveragePenalizer
 from summarize.nn.length_penalizers import LengthPenalizer
 
 
@@ -47,6 +49,10 @@ class BeamSearch(FromParams):
     length_penalizer: ``LengthPenalizer``, optional (default = ``None``)
         The length penalizer that should be used to rerank the candidate summaries
         after beam search has finished.
+    coverage_penalizer: ``CoveragePenalizer``, optional (defautl = ``None``)
+        The coverage penalizer that should be used to augment the scores of
+        each prediction at each step of decoding. The sequence log-probabilities
+        will be augmented by this score only for selecting the next token.
     """
     def __init__(self,
                  vocab: Vocabulary,
@@ -58,7 +64,8 @@ class BeamSearch(FromParams):
                  per_node_beam_size: int = None,
                  disallow_repeated_ngrams: int = None,
                  repeated_ngrams_exceptions: List[List[str]] = None,
-                 length_penalizer: LengthPenalizer = None) -> None:
+                 length_penalizer: LengthPenalizer = None,
+                 coverage_penalizer: CoveragePenalizer = None) -> None:
         self.beam_size = beam_size
         end_symbol = end_symbol or END_SYMBOL
         self._end_index = vocab.get_token_index(end_symbol, namespace)
@@ -66,6 +73,7 @@ class BeamSearch(FromParams):
         self.min_steps = min_steps
         self.per_node_beam_size = per_node_beam_size or beam_size
         self.length_penalizer = length_penalizer
+        self.coverage_penalizer = coverage_penalizer
 
         # Convert the ngram exceptions to tuples of the corresponding indices
         self.disallow_repeated_ngrams = disallow_repeated_ngrams
@@ -86,48 +94,132 @@ class BeamSearch(FromParams):
                 ngram_indices.append(token_to_index[token])
             self.repeated_ngrams_exceptions.add(tuple(ngram_indices))
 
+    def _reconstruct_predictions(self,
+                                 predictions: List[torch.Tensor],
+                                 backpointers: List[torch.Tensor],
+                                 num_steps: int = None) -> torch.Tensor:
+        """
+        Reconstruct the predictions using the predictions thus far and the
+        backpointers for a given number of steps. The ``predictions`` can't
+        just be directly traversed without the backpointers because it's the
+        output of the beam search. It's impossible to know which predictions
+        are still valid without the back pointers.
+
+        Parameters
+        ----------
+        predictions: List[torch.Tensor]
+            The list of (batch_size, beam_size) output tokens at each step of
+            the search thus far
+        backpointers: List[torch.Tensor]
+            The list of (batch_size, beam_size) backpointers for each step of
+            the search thus far.
+        num_steps: int, optional (default = ``None``)
+            The number of steps from the most recent to reconstruct. If ``None``,
+            the entire sequence will be reconstructed.
+
+        Returns
+        -------
+        torch.Tensor, (batch_size, beam_size, num_steps)
+            The reconstructed predictions.
+        """
+
+        num_steps = num_steps or len(predictions)
+        if num_steps == 1:
+            # shape: (batch_size, beam_size, 1)
+            return predictions[-1].unsqueeze(2)
+
+        # shape: [(batch_size, beam_size, 1)]
+        reconstructed_predictions = [predictions[-1].unsqueeze(2)]
+
+        # shape: (batch_size, beam_size)
+        cur_backpointers = backpointers[-1]
+
+        # The inclusive last index of the prediction
+        end = len(predictions) - 1
+        # The inclusive first index of the prediction
+        start = end - num_steps + 1
+
+        for timestep in range(end - 1, start, -1):
+            # shape: (batch_size, beam_size, 1)
+            cur_preds = predictions[timestep].gather(1, cur_backpointers).unsqueeze(2)
+
+            reconstructed_predictions.append(cur_preds)
+
+            # shape: (batch_size, beam_size)
+            cur_backpointers = backpointers[timestep - 1].gather(1, cur_backpointers)
+
+        # shape: (batch_size, beam_size, 1)
+        final_preds = predictions[start].gather(1, cur_backpointers).unsqueeze(2)
+
+        reconstructed_predictions.append(final_preds)
+
+        # shape: (batch_size, beam_size, max_steps)
+        all_predictions = torch.cat(list(reversed(reconstructed_predictions)), 2)
+        return all_predictions
+
     def _mask_disallowed_ngrams(self,
                                 predictions: List[torch.Tensor],
+                                backpointers: List[torch.Tensor],
                                 class_log_probabilities: torch.Tensor,
                                 disallowed_ngrams: List[List[Dict[Tuple[int, ...], List[int]]]]) -> None:
         """
         Performs an in-place modification of the class log-probabilities based on
         not allowing certain ngrams to be repeated.
         """
-        if self.disallow_repeated_ngrams is not None:
-            batch_size = predictions[0].size(0)
-            if len(predictions) >= self.disallow_repeated_ngrams:
-                for i in range(batch_size):
-                    for j in range(self.beam_size):
-                        prefix = []
-                        for k in range(self.disallow_repeated_ngrams - 1):
-                            offset = self.disallow_repeated_ngrams - k - 1
-                            prefix.append(predictions[-offset][i, j].item())
-                        prefix = tuple(prefix)
-                        if prefix in disallowed_ngrams[i][j]:
-                            for index in disallowed_ngrams[i][j][prefix]:
-                                class_log_probabilities[i * self.beam_size + j, index] = float('-inf')
+        if self.disallow_repeated_ngrams is None:
+            return
+        if len(predictions) < self.disallow_repeated_ngrams:
+            return
+
+        batch_size = predictions[0].size(0)
+        # shape: (batch_size, beam_size, num_steps)
+        reconstructed_ngrams = \
+            self._reconstruct_predictions(predictions, backpointers,
+                                          num_steps=self.disallow_repeated_ngrams)
+        for i in range(batch_size):
+            for j in range(self.beam_size):
+                ngram = reconstructed_ngrams[i, j].tolist()
+                prefix = tuple(ngram[:-1])
+                if prefix in disallowed_ngrams[i][j]:
+                    for index in disallowed_ngrams[i][j][prefix]:
+                        class_log_probabilities[i * self.beam_size + j, index] = float('-inf')
 
     def _update_disallowed_ngrams(self,
                                   predictions: List[torch.Tensor],
+                                  backpointers: List[torch.Tensor],
                                   disallowed_ngrams: List[List[Dict[Tuple[int, ...], List[int]]]]) -> None:
-        """Updates the disallowed ngrams in-place based on the predictions thus far."""
-        if self.disallow_repeated_ngrams is not None:
-            batch_size = predictions[0].size(0)
-            if len(predictions) >= self.disallow_repeated_ngrams:
-                for i in range(batch_size):
-                    for j in range(self.beam_size):
-                        prefix = []
-                        for k in range(self.disallow_repeated_ngrams - 1):
-                            offset = self.disallow_repeated_ngrams - k
-                            prefix.append(predictions[-offset][i, j].item())
-                        token = predictions[-1][i, j].item()
-                        ngram = tuple(prefix + [token])
-                        # Don't add this ngram to the disallowed set if it's
-                        # part of the exceptions
-                        if ngram not in self.repeated_ngrams_exceptions:
-                            prefix = tuple(prefix)
-                            disallowed_ngrams[i][j][prefix].append(token)
+        batch_size = predictions[0].size(0)
+        updated_disallowed_ngrams = [[defaultdict(list) for _ in range(self.beam_size)] for _ in range(batch_size)]
+
+        if self.disallow_repeated_ngrams is None:
+            return updated_disallowed_ngrams
+        if len(predictions) < self.disallow_repeated_ngrams:
+            return updated_disallowed_ngrams
+
+        # Reconstruct all of the most recent ngrams
+        # shape: (batch_size, beam_size, num_steps)
+        reconstructed_ngrams = \
+            self._reconstruct_predictions(predictions, backpointers,
+                                          num_steps=self.disallow_repeated_ngrams)
+        for i in range(batch_size):
+            for j in range(self.beam_size):
+                # First, figure out where the last prediction came from. We need
+                # to copy those blocked ngrams. The backpointers are 1 shorter
+                # than the predictions (because there's no backpointer to the
+                # start token), so if its length is 0, that means there's nothing
+                # to copy
+                if len(backpointers) != 0:
+                    backpointer = backpointers[-1][i][j]
+                    updated_disallowed_ngrams[i][j].update(disallowed_ngrams[i][backpointer])
+
+                ngram = tuple(reconstructed_ngrams[i, j].tolist())
+                prefix, token = ngram[:-1], ngram[-1]
+                # Don't add this ngram to the disallowed set if it's
+                # part of the exceptions
+                if ngram not in self.repeated_ngrams_exceptions:
+                    updated_disallowed_ngrams[i][j][prefix].append(token)
+
+        return updated_disallowed_ngrams
 
     def search(self,
                start_predictions: torch.Tensor,
@@ -235,7 +327,7 @@ class BeamSearch(FromParams):
         # shape: [(batch_size, beam_size)]
         predictions.append(start_predicted_classes)
 
-        self._update_disallowed_ngrams(predictions, disallowed_ngrams)
+        disallowed_ngrams = self._update_disallowed_ngrams(predictions, backpointers, disallowed_ngrams)
 
         # Log probability tensor that mandates that the end token is selected.
         # shape: (batch_size * beam_size, num_classes)
@@ -257,6 +349,14 @@ class BeamSearch(FromParams):
         # Maintains the length of each prediction, not including the start
         # or end token
         lengths = start_class_log_probabilities.new_zeros(batch_size * self.beam_size, dtype=torch.long)
+
+        # If we are applying a coverage penalty, we have to maintain the coverage
+        # of each prediction. We initialize it here to be the attention distribution
+        # of the first token. It is ok not to penalize the first token because
+        # the penalty should be 0.
+        if self.coverage_penalizer is not None:
+            # shape: (batch_size * beam_size, num_document_tokens)
+            coverage = state['attention']
 
         for timestep in range(self.max_steps - 1):
             # shape: (batch_size * beam_size,)
@@ -289,7 +389,7 @@ class BeamSearch(FromParams):
 
             # If there are ngrams which are disallowed, we prevent any token
             # which would repeat an ngram from being generated
-            self._mask_disallowed_ngrams(predictions, class_log_probabilities, disallowed_ngrams)
+            self._mask_disallowed_ngrams(predictions, backpointers, class_log_probabilities, disallowed_ngrams)
 
             # Here we are finding any beams where we predicted the end token in
             # the previous timestep and replacing the distribution with a
@@ -305,6 +405,16 @@ class BeamSearch(FromParams):
             # shape (both): (batch_size * beam_size, per_node_beam_size)
             top_log_probabilities, predicted_classes = \
                 cleaned_log_probabilities.topk(self.per_node_beam_size)
+
+            if self.coverage_penalizer is not None:
+                # Update the coverage for this step, get the coverage penalty,
+                # then add it to the log-probabilities thus far so it effects
+                # the subsequent top-k decision.
+                coverage += state['attention']
+                # shape: (batch_size * beam_size)
+                coverage_penalty = self.coverage_penalizer(coverage)
+                # TODO wrong shape
+                last_log_probabilities = last_log_probabilities + coverage_penalty
 
             # Here we expand the last log probabilities to (batch_size * beam_size, per_node_beam_size)
             # so that we can add them to the current log probs for this timestep.
@@ -336,9 +446,6 @@ class BeamSearch(FromParams):
 
             predictions.append(restricted_predicted_classes)
 
-            # Update the disallowed ngrams
-            self._update_disallowed_ngrams(predictions, disallowed_ngrams)
-
             # shape: (batch_size, beam_size)
             last_log_probabilities = restricted_beam_log_probs
 
@@ -350,6 +457,9 @@ class BeamSearch(FromParams):
             backpointer = restricted_beam_indices / self.per_node_beam_size
 
             backpointers.append(backpointer)
+
+            # Update the disallowed ngrams
+            disallowed_ngrams = self._update_disallowed_ngrams(predictions, backpointers, disallowed_ngrams)
 
             # Keep only the pieces of the state tensors corresponding to the
             # ancestors created this iteration.
@@ -378,29 +488,8 @@ class BeamSearch(FromParams):
                           "to find a sequence longer than the minimum number of steps.",
                           RuntimeWarning)
 
-        # Reconstruct the sequences.
-        # shape: [(batch_size, beam_size, 1)]
-        reconstructed_predictions = [predictions[-1].unsqueeze(2)]
-
-        # shape: (batch_size, beam_size)
-        cur_backpointers = backpointers[-1]
-
-        for timestep in range(len(predictions) - 2, 0, -1):
-            # shape: (batch_size, beam_size, 1)
-            cur_preds = predictions[timestep].gather(1, cur_backpointers).unsqueeze(2)
-
-            reconstructed_predictions.append(cur_preds)
-
-            # shape: (batch_size, beam_size)
-            cur_backpointers = backpointers[timestep - 1].gather(1, cur_backpointers)
-
-        # shape: (batch_size, beam_size, 1)
-        final_preds = predictions[0].gather(1, cur_backpointers).unsqueeze(2)
-
-        reconstructed_predictions.append(final_preds)
-
-        # shape: (batch_size, beam_size, max_steps)
-        all_predictions = torch.cat(list(reversed(reconstructed_predictions)), 2)
+        # Reconstruct the sequences using the backpointers
+        all_predictions = self._reconstruct_predictions(predictions, backpointers)
 
         # Use the length penalizer to rerank the predictions if one is provided
         if self.length_penalizer is not None:
