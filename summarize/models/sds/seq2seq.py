@@ -279,7 +279,9 @@ class Seq2SeqModel(Model):
             summary_tokens = summary_tokens.unsqueeze(-1)
         group_size, num_summary_tokens = summary_tokens.size()
 
-        # Unpack everything from the input state
+        # Unpack everything from the input state. The attention probabilities
+        # are there, but we don't need them for computation. They are only for
+        # the beam search.
         # shape: (group_size, num_document_tokens)
         document_mask = state['document_mask']
         # shape: (group_size, num_document_tokens, encoder_hidden_size)
@@ -311,6 +313,7 @@ class Seq2SeqModel(Model):
         # the vectorized version, which should be faster
         if self.use_input_feeding:
             decoder_outputs = []
+            attention_probabilities_list = []
             for i in range(num_summary_tokens):
                 # Setup the input to the decoder, optionally using input feeding
                 # shape: (batch_size, embedding_size)
@@ -323,22 +326,27 @@ class Seq2SeqModel(Model):
                 # Pass the input through the decoder
                 # shape: (group_size, 1, decoder_hidden_size)
                 # shape: (1, group_size, decoder_hidden_size)
-                decoder_output, decoder_state = \
+                # shape: (group_size, 1, num_document_tokens)
+                decoder_output, decoder_state, attention_probabilities = \
                     self._decoder_forward(input_embedding, decoder_state, encoder_outputs, document_mask)
 
-                # Save the decoder output
+                # Save the decoder output and attention probabilities
                 decoder_outputs.append(decoder_output)
+                attention_probabilities_list.append(attention_probabilities)
                 # Take the new ``input_feed`` vector
                 # shape: (group_size, decoder_hidden_size)
                 input_feed = decoder_output.squeeze(1)
 
-            # Combine all the decoder outputs
+            # Combine all the decoder outputs and attention probabilities
             # shape: (group_size, num_summary_tokens, decoder_hidden_size)
             decoder_outputs = torch.cat(decoder_outputs, dim=1)
+            # shape: (group_size, num_summary_tokens, num_document_tokens)
+            attention_probabilities = torch.cat(attention_probabilities_list, dim=1)
         else:
             # shape: (group_size, num_summary_tokens, decoder_hidden_size)
             # shape: (1, group_size, decoder_hidden_size)
-            decoder_outputs, decoder_state = \
+            # shape: (group-size, num_summary_tokens, num_document_tokens)
+            decoder_outputs, decoder_state, attention_probabilities = \
                 self._decoder_forward(summary_token_embeddings, decoder_state, encoder_outputs, document_mask)
 
         # Remove the first dimension which is unnecessary as this is only
@@ -362,6 +370,8 @@ class Seq2SeqModel(Model):
         if is_inference:
             # shape: (group_size, summary_vocab_size)
             output_scores = torch.log_softmax(logits, dim=2).squeeze(1)
+            # shape: (group_size, num_document_tokens)
+            attention_probabilities = attention_probabilities.squeeze(1)
         else:
             output_scores = logits
 
@@ -370,6 +380,7 @@ class Seq2SeqModel(Model):
         output_state['hidden'] = hidden
         output_state['memory'] = memory
         output_state['input_feed'] = input_feed
+        output_state['attention'] = attention_probabilities
 
         return output_scores, output_state
 
@@ -424,6 +435,8 @@ class Seq2SeqModel(Model):
             The decoder hidden representation with attention.
         hidden: ``Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]``
             The final hidden states.
+        attention_probabilities: ``torch.Tensor``, ``(batch_size, num_summary_tokens, num_document_tokens)``
+            The attention probabilities over the document tokens for each summary token
         """
         # Pass the tokens through the decoder. Masking is not necessary because
         # if this method is used for beam search, anything after <eos> will be
@@ -437,8 +450,10 @@ class Seq2SeqModel(Model):
 
         # Add in the attention mechanism
         # shape: (group_size, num_summary_tokens, decoder_hidden_size)
-        decoder_outputs = self._compute_attention(encoder_outputs, encoder_mask, decoder_outputs)
-        return decoder_outputs, hidden
+        # shape: (group_size, num_summary_tokens, num_document_tokens)
+        decoder_outputs, attention_probabilities = \
+            self._compute_attention(encoder_outputs, encoder_mask, decoder_outputs)
+        return decoder_outputs, hidden, attention_probabilities
 
     def _compute_attention(self,
                            encoder_outputs: torch.Tensor,
@@ -465,6 +480,8 @@ class Seq2SeqModel(Model):
         -------
         hidden: ``torch.Tensor``, ``(batch_size, num_summary_tokens, decoder_hidden_size)``
             The new decoder hidden state representation.
+        attention_probabilities: ``torch.Tensor``, ``(batch_size, num_summary_tokens, num_document_tokens)``
+            The attention probabilities over the document tokens for each summary token
         """
         # Compute the attention context
         # shape: (group_size, num_summary_tokens, num_document_tokens)
@@ -481,7 +498,7 @@ class Seq2SeqModel(Model):
 
         # shape: (group_size, num_summary_tokens, decoder_hidden_size)
         projected_hidden = self.attention_layer(concat)
-        return projected_hidden
+        return projected_hidden, attention_probabilities
 
     def _compute_loss(self,
                       logits: torch.Tensor,

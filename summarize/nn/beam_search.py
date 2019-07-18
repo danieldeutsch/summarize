@@ -360,8 +360,8 @@ class BeamSearch(FromParams):
         # of the first token. It is ok not to penalize the first token because
         # the penalty should be 0.
         if self.coverage_penalizer is not None:
-            # shape: (batch_size * beam_size, num_document_tokens)
-            coverage = state['attention']
+            # shape: (batch_size, beam_size, num_document_tokens)
+            coverage = state['attention'].clone().view(batch_size, self.beam_size, -1)
 
         for timestep in range(self.max_steps - 1):
             # shape: (batch_size * beam_size,)
@@ -412,14 +412,19 @@ class BeamSearch(FromParams):
                 cleaned_log_probabilities.topk(self.per_node_beam_size)
 
             if self.coverage_penalizer is not None:
-                # Update the coverage for this step, get the coverage penalty,
-                # then add it to the log-probabilities thus far so it effects
-                # the subsequent top-k decision.
-                coverage += state['attention']
-                # shape: (batch_size * beam_size)
-                coverage_penalty = self.coverage_penalizer(coverage)
-                # TODO wrong shape
-                last_log_probabilities = last_log_probabilities + coverage_penalty
+                # To update the coverage penalty for this step, we first update
+                # the coverage vector with the attention scores for this step,
+                # compute the corresponding penalty, then add the peanlty to
+                # the token log probabilites
+                # shape: (batch_size, beam_size, num_document_tokens)
+                coverage += state['attention'].view(batch_size, self.beam_size, -1)
+                # shape: (batch_size * beam_size, per_node_beam_size)
+                coverage_penalty = self.coverage_penalizer(coverage).\
+                    unsqueeze(2).\
+                    expand(batch_size, self.beam_size, self.per_node_beam_size).\
+                    reshape(batch_size * self.beam_size, self.per_node_beam_size)
+                # shape: (batch_size * beam_size, per_node_beam_size)
+                top_log_probabilities += coverage_penalty
 
             # Here we expand the last log probabilities to (batch_size * beam_size, per_node_beam_size)
             # so that we can add them to the current log probs for this timestep.
@@ -453,6 +458,12 @@ class BeamSearch(FromParams):
 
             # shape: (batch_size, beam_size)
             last_log_probabilities = restricted_beam_log_probs
+
+            # Remove the coverage penalty to recover the true log-probabilities
+            if self.coverage_penalizer is not None:
+                # shape: (batch_size, beam_size)
+                selected_coverage_penalties = coverage_penalty.gather(1, restricted_beam_indices)
+                last_log_probabilities -= selected_coverage_penalties
 
             # The beam indices come from a `beam_size * per_node_beam_size` dimension where the
             # indices with a common ancestor are grouped together. Hence
