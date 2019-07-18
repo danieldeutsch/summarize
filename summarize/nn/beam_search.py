@@ -122,7 +122,6 @@ class BeamSearch(FromParams):
         torch.Tensor, (batch_size, beam_size, num_steps)
             The reconstructed predictions.
         """
-
         num_steps = num_steps or len(predictions)
         if num_steps == 1:
             # shape: (batch_size, beam_size, 1)
@@ -172,14 +171,20 @@ class BeamSearch(FromParams):
             return
 
         batch_size = predictions[0].size(0)
-        # shape: (batch_size, beam_size, num_steps)
-        reconstructed_ngrams = \
-            self._reconstruct_predictions(predictions, backpointers,
-                                          num_steps=self.disallow_repeated_ngrams)
+
+        # If we are disallowing repeated unigrams, there is no prefix to reconstruct.
+        # It's ugly, but we handle the case separately
+        if self.disallow_repeated_ngrams != 1:
+            # shape: (batch_size, beam_size, num_steps)
+            reconstructed_ngrams = \
+                self._reconstruct_predictions(predictions, backpointers,
+                                              num_steps=self.disallow_repeated_ngrams - 1)
         for i in range(batch_size):
             for j in range(self.beam_size):
-                ngram = reconstructed_ngrams[i, j].tolist()
-                prefix = tuple(ngram[:-1])
+                if self.disallow_repeated_ngrams == 1:
+                    prefix = tuple()
+                else:
+                    prefix = tuple(reconstructed_ngrams[i, j].tolist())
                 if prefix in disallowed_ngrams[i][j]:
                     for index in disallowed_ngrams[i][j][prefix]:
                         class_log_probabilities[i * self.beam_size + j, index] = float('-inf')
