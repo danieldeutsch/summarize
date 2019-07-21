@@ -97,7 +97,15 @@ local hidden_size = 512;
       "min_steps": 35,
       "max_steps": 100,
       "disallow_repeated_ngrams": 3,
-      "repeated_ngrams_exceptions": [[".", "@sent_end@", "@sent_start@"]]
+      "repeated_ngrams_exceptions": [[".", "@sent_end@", "@sent_start@"]],
+      "length_penalizer": {
+        "type": "wu",
+        "alpha": 0.9
+      },
+      "coverage_penalizer": {
+        "type": "onmt",
+        "beta": 5
+      }
     },
     "validation_beam_search": {
       "beam_size": 10,
