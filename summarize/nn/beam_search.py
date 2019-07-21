@@ -467,8 +467,15 @@ class BeamSearch(FromParams):
                 # shape: (batch_size, beam_size)
                 selected_coverage_penalties = coverage_penalty.gather(1, restricted_beam_indices)
                 last_log_probabilities -= selected_coverage_penalties
+                # shape: (batch_size, beam_size * per_node_beam_size, num_document_tokens)
+                coverage = coverage.unsqueeze(2).\
+                    expand(-1, -1, self.per_node_beam_size, -1).\
+                    reshape(batch_size, self.beam_size * self.per_node_beam_size, -1)
                 # shape: (batch_size, beam_size, num_document_tokens)
-                coverage = coverage.index_select(1, restricted_beam_indices)
+                reshaped_indices = restricted_beam_indices.unsqueeze(2).\
+                    expand(-1, -1, coverage.size(-1))
+                # shape: (batch_size, beam_size, num_document_tokens)
+                coverage = coverage.gather(1, reshaped_indices)
 
             # The beam indices come from a `beam_size * per_node_beam_size` dimension where the
             # indices with a common ancestor are grouped together. Hence
