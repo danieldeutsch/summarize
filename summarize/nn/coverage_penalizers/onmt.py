@@ -26,6 +26,5 @@ class ONMTCoveragePenalizer(CoveragePenalizer):
     @overrides
     def __call__(self, coverage: torch.Tensor) -> torch.Tensor:
         num_document_tokens = coverage.size(-1)
-        ones = coverage.new_ones(coverage.size())
-        penalty = num_document_tokens - torch.max(coverage, ones).sum(dim=-1)
+        penalty = num_document_tokens - torch.clamp(coverage, 1.0).sum(dim=-1)
         return self.beta * penalty
