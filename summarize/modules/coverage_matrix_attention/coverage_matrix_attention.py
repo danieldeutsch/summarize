@@ -40,7 +40,7 @@ class CoverageMatrixAttention(torch.nn.Module, Registrable):
         Returns
         -------
         torch.Tensor: (batch_size, num_decoder_tokens, num_encoder_tokens)
-            The attention scores between each decoder and encoder hidden representations.
+            The attention probabilities between each decoder and encoder hidden representations.
         torch.Tensor: (batch_size, num_decoder_tokens, num_encoder_tokens)
             The coverage vectors used to compute the corresponding attention probabilities.
         torch.Tensor: (batch_size, num_encoder_tokens)
