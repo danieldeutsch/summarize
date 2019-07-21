@@ -1,1 +1,2 @@
 from summarize.data.dataset_readers.sds.abstractive import AbstractiveDatasetReader
+from summarize.data.dataset_readers.sds.pointer_generator import PointerGeneratorDatasetReader
