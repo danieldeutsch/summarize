@@ -462,6 +462,8 @@ class BeamSearch(FromParams):
             # Remove the coverage penalty to recover the true log-probabilities and
             # update the coverage vectors based on the selected indices
             if self.coverage_penalizer is not None:
+                # shape: (batch_size, beam_size * per_node_beam_size)
+                coverage_penalty = coverage_penalty.reshape(batch_size, self.beam_size * self.per_node_beam_size)
                 # shape: (batch_size, beam_size)
                 selected_coverage_penalties = coverage_penalty.gather(1, restricted_beam_indices)
                 last_log_probabilities -= selected_coverage_penalties
