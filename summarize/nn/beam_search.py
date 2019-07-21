@@ -459,11 +459,14 @@ class BeamSearch(FromParams):
             # shape: (batch_size, beam_size)
             last_log_probabilities = restricted_beam_log_probs
 
-            # Remove the coverage penalty to recover the true log-probabilities
+            # Remove the coverage penalty to recover the true log-probabilities and
+            # update the coverage vectors based on the selected indices
             if self.coverage_penalizer is not None:
                 # shape: (batch_size, beam_size)
                 selected_coverage_penalties = coverage_penalty.gather(1, restricted_beam_indices)
                 last_log_probabilities -= selected_coverage_penalties
+                # shape: (batch_size, beam_size, num_document_tokens)
+                coverage = coverage.index_select(1, restricted_beam_indices)
 
             # The beam indices come from a `beam_size * per_node_beam_size` dimension where the
             # indices with a common ancestor are grouped together. Hence
