@@ -12,7 +12,6 @@ for split in valid test; do
     --cuda-device 0 \
     --batch-size 16 \
     --silent \
-    --use-dataset-reader \
     ${model_file} \
     https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/${split}.tokenized.v1.0.jsonl.gz
 done

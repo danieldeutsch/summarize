@@ -1,7 +1,5 @@
 local embed_size = 128;
-local hidden_size = 256;
-local encoder_hidden_size = hidden_size * 2;
-local decoder_hidden_size = hidden_size;
+local hidden_size = 512;
 
 {
   "dataset_reader": {
@@ -39,6 +37,7 @@ local decoder_hidden_size = hidden_size;
   },
   "train_data_path": "https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/train.tokenized.v1.0.jsonl.gz",
   "validation_data_path": "https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/valid.tokenized.v1.0.jsonl.gz",
+  "datasets_for_vocab_creation": ["train"],
   "model": {
     "type": "sds-seq2seq",
     "document_token_embedder": {
@@ -47,45 +46,64 @@ local decoder_hidden_size = hidden_size;
         "embedding_dim": embed_size
       }
     },
+    "summary_token_embedder": {
+      "type": "embedding",
+      "embedding_dim": embed_size
+    },
     "encoder": {
       "type": "lstm",
       "input_size": embed_size,
-      "hidden_size": encoder_hidden_size / 2,
+      "hidden_size": hidden_size / 2,
       "bidirectional": true
     },
-    "hidden_projection_layer": {
-      "input_dim": encoder_hidden_size,
-      "hidden_dims": decoder_hidden_size,
-      "num_layers": 1,
-      "activations": "relu"
-    },
-    "memory_projection_layer": {
-      "input_dim": encoder_hidden_size,
-      "hidden_dims": decoder_hidden_size,
-      "num_layers": 1,
-      "activations": "relu"
+    "bridge": {
+      "share_bidirectional_parameters": true,
+      "layers": [
+        {
+          "input_dim": hidden_size / 2,
+          "hidden_dims": hidden_size / 2,
+          "num_layers": 1,
+          "activations": "relu"
+        },
+        {
+          "input_dim": hidden_size / 2,
+          "hidden_dims": hidden_size / 2,
+          "num_layers": 1,
+          "activations": "relu"
+        }
+      ]
     },
     "attention": {
       "type": "mlp",
-      "encoder_size": encoder_hidden_size,
-      "decoder_size": decoder_hidden_size,
-      "attention_size": encoder_hidden_size
+      "encoder_size": hidden_size,
+      "decoder_size": hidden_size,
+      "attention_size": hidden_size
     },
     "attention_layer": {
-      "input_dim": encoder_hidden_size + decoder_hidden_size,
-      "hidden_dims": decoder_hidden_size,
+      "input_dim": hidden_size + hidden_size,
+      "hidden_dims": hidden_size,
       "num_layers": 1,
       "activations": "linear"
     },
     "decoder": {
       "type": "lstm",
-      "input_size": embed_size + decoder_hidden_size,
-      "hidden_size": decoder_hidden_size
+      "input_size": embed_size + hidden_size,
+      "hidden_size": hidden_size
     },
     "use_input_feeding": true,
-    "beam_size": 4,
-    "min_output_length": 35,
-    "max_output_length": 100,
+    "loss_normalization": "summaries",
+    "beam_search": {
+      "beam_size": 10,
+      "min_steps": 35,
+      "max_steps": 100,
+      "disallow_repeated_ngrams": 3,
+      "repeated_ngrams_exceptions": [[".", "@sent_end@", "@sent_start@"]]
+    },
+    "validation_beam_search": {
+      "beam_size": 10,
+      "min_steps": 35,
+      "max_steps": 100
+    },
     "metrics": [
       {
         "type": "python-rouge",
@@ -96,7 +114,8 @@ local decoder_hidden_size = hidden_size;
   "iterator": {
     "type": "bucket",
     "batch_size": 16,
-    "sorting_keys": [["document", "num_tokens"]]
+    "sorting_keys": [["document", "num_tokens"]],
+    "instances_per_epoch": 160000
   },
   "validation_iterator": {
     "type": "bucket",
@@ -109,9 +128,14 @@ local decoder_hidden_size = hidden_size;
       "lr": 0.15,
       "initial_accumulator_value": 0.1
     },
+    "learning_rate_scheduler": {
+      "type": "multi_step",
+      "gamma": 0.5,
+      "milestones": std.range(5, 20)
+    },
     "grad_norm": 2,
-    "num_epochs": 15,
-    "validation_metric": "+R2-F1",
-    "cuda_device": 0
+    "num_epochs": 20,
+    "cuda_device": 0,
+    "shuffle": true
   }
 }
