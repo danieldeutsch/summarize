@@ -117,6 +117,9 @@ local hidden_size = 512;
         "type": "python-rouge",
         "ngram_orders": [1, 2]
       }
+    ],
+    "initializer": [
+      [".*", {"type": "uniform", "a": -0.1, "b": 0.1}]
     ]
   },
   "iterator": {
