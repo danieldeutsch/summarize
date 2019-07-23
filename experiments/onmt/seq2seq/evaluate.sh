@@ -5,9 +5,11 @@ results_dir=${expt_dir}/results
 mkdir -p ${results_dir}
 
 for split in valid test; do
-  python -m summarize.metrics.rouge \
-    https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/${split}.tokenized.v1.0.jsonl.gz \
-    ${output_dir}/${split}.jsonl \
-    --silent \
-    --output-file ${results_dir}/${split}.metrics.json
+  for constraints in none min-length repeated-trigrams length coverage; do
+    python -m summarize.metrics.rouge \
+      https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/${split}.tokenized.v1.0.jsonl.gz \
+      ${output_dir}/${split}.${constraints}.jsonl \
+      --silent \
+      --output-file ${results_dir}/${split}.${constraints}.metrics.json
+  done
 done
