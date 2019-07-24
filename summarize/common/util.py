@@ -3,3 +3,6 @@
 # ending of full sequences.
 SENT_START_SYMBOL = '@sent_start@'
 SENT_END_SYMBOL = '@sent_end@'
+
+# This symbol represents the copy token in the Pointer-Generator model
+COPY_SYMBOL = '@copy@'
