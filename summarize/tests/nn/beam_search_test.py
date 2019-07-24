@@ -34,15 +34,6 @@ infinite_transition_probabilities = torch.tensor(
          [0.0, 0.0, 0.0, 0.0, 0.0, 1.0]]  # end token -> jth token
 )
 
-linear_chain_transition_probabilities = torch.tensor(
-        [[0.0, 0.9, 0.1, 0.0, 0.0, 0.0],  # start token -> jth token
-         [0.0, 0.9, 0.1, 0.0, 0.0, 0.0],  # 1st token -> jth token
-         [0.0, 0.0, 0.9, 0.1, 0.0, 0.0],  # 2nd token -> jth token
-         [0.0, 0.0, 0.0, 0.9, 0.1, 0.0],  # ...
-         [0.0, 0.0, 0.0, 0.0, 0.9, 0.1],  # ...
-         [0.0, 0.0, 0.0, 0.0, 0.0, 1.0]]  # end token -> jth token
-)
-
 
 def take_step(last_predictions: torch.Tensor,
               state: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
@@ -73,17 +64,6 @@ def take_infinite_step(last_predictions: torch.Tensor,
         log_probs_list.append(log_probs)
 
     return torch.stack(log_probs_list), state
-
-
-def take_linear_chain_step(last_predictions: torch.Tensor,
-                           state: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
-    log_probs_list = []
-    for last_token in last_predictions:
-        log_probs = torch.log(linear_chain_transition_probabilities[last_token.item()])
-        log_probs_list.append(log_probs)
-
-    return torch.stack(log_probs_list), state
-
 
 
 class BeamSearchTest(AllenNlpTestCase):
@@ -279,90 +259,59 @@ class BeamSearchTest(AllenNlpTestCase):
         with pytest.warns(RuntimeWarning, match="Infinite log probabilities"):
             beam_search.search(initial_predictions, {}, take_step)
 
-    def test_disallow_repeated_ngrams(self):
-        # Make sure the unconstrained search returns what's expected
-        beam_search = BeamSearch(self.vocab, beam_size=2, max_steps=10, end_symbol=self.end_symbol)
-        expected_top_k = np.array([[1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
-                                   [2, 2, 2, 2, 2, 2, 2, 2, 2, 2]])
-        expected_log_probs = np.log(np.array([0.9 ** 10,
-                                              0.1 ** 1 * 0.9 ** 9]))
-        self._check_results(expected_top_k=expected_top_k,
-                            expected_log_probs=expected_log_probs,
-                            beam_search=beam_search,
-                            step=take_linear_chain_step,
-                            rtol=1e-5)
+    def test_reconstruct_predictions(self):
+        predictions = [
+            torch.LongTensor([
+                [0, 1, 2],
+                [3, 4, 5]
+            ]),
+            torch.LongTensor([
+                [6, 7, 8],
+                [9, 10, 11]
+            ]),
+            torch.LongTensor([
+                [12, 13, 14],
+                [15, 16, 17]
+            ]),
+            torch.LongTensor([
+                [18, 19, 20],
+                [21, 22, 23]
+            ])
+        ]
+        backpointers = [
+            torch.LongTensor([
+                [0, 1, 0],
+                [0, 1, 2]
+            ]),
+            torch.LongTensor([
+                [2, 1, 0],
+                [0, 0, 1]
+            ]),
+            torch.LongTensor([
+                [1, 2, 0],
+                [0, 1, 2]
+            ])
+        ]
+        reconstructed_predictions = torch.LongTensor([
+            [
+                [1, 7, 13, 18],
+                [0, 6, 14, 19],
+                [0, 8, 12, 20]
+            ],
+            [
+                [3, 9, 15, 21],
+                [3, 9, 16, 22],
+                [4, 10, 17, 23]
+            ]
+        ])
 
-        # Prevent repeat unigrams
-        beam_search = BeamSearch(self.vocab, beam_size=2, max_steps=10, end_symbol=self.end_symbol,
-                                 disallow_repeated_ngrams=1)
-        expected_top_k = np.array([[2, 3, 4, 5, 5],
-                                   [1, 2, 3, 4, 5]])
-        expected_log_probs = np.log(np.array([0.1 ** 4,
-                                              0.9 * 0.1 ** 4]))
-        self._check_results(expected_top_k=expected_top_k,
-                            expected_log_probs=expected_log_probs,
-                            beam_search=beam_search,
-                            step=take_linear_chain_step)
+        actual_reconstructed = self.beam_search._reconstruct_predictions(predictions, backpointers)
+        assert torch.equal(reconstructed_predictions, actual_reconstructed)
 
-        # Prevent repeat unigrams except "3"
-        beam_search = BeamSearch(self.vocab, beam_size=2, max_steps=10, end_symbol=self.end_symbol,
-                                 disallow_repeated_ngrams=1, repeated_ngrams_exceptions=[["3"]])
-        expected_top_k = np.array([[1, 2, 3, 3, 3, 3, 3, 3, 3, 3],
-                                   [2, 3, 3, 3, 3, 3, 3, 3, 3, 3]])
-        expected_log_probs = np.log(np.array([0.1 ** 2 * 0.9 ** 8,
-                                              0.1 ** 2 * 0.9 ** 8]))
-        self._check_results(expected_top_k=expected_top_k,
-                            expected_log_probs=expected_log_probs,
-                            beam_search=beam_search,
-                            step=take_linear_chain_step)
-
-        # Prevent repeat bigrams
-        beam_search = BeamSearch(self.vocab, beam_size=2, max_steps=10, end_symbol=self.end_symbol,
-                                 disallow_repeated_ngrams=2)
-        expected_top_k = np.array([[2, 2, 3, 3, 4, 4, 5, 5, 5],
-                                   [1, 1, 2, 2, 3, 3, 4, 4, 5]])
-        expected_log_probs = np.log(np.array([0.1 ** 4 * 0.9 ** 3,
-                                              0.1 ** 4 * 0.9 ** 5]))
-        self._check_results(expected_top_k=expected_top_k,
-                            expected_log_probs=expected_log_probs,
-                            beam_search=beam_search,
-                            step=take_linear_chain_step)
-
-        # Prevent repeat bigrams except "3 3"
-        beam_search = BeamSearch(self.vocab, beam_size=2, max_steps=10, end_symbol=self.end_symbol,
-                                 disallow_repeated_ngrams=2, repeated_ngrams_exceptions=[["3", "3"]])
-        expected_top_k = np.array([[1, 1, 2, 2, 3, 3, 3, 3, 3, 3],
-                                   [2, 2, 3, 3, 3, 3, 3, 3, 3, 3]])
-        expected_log_probs = np.log(np.array([0.1 ** 2 * 0.9 ** 8,
-                                              0.1 ** 2 * 0.9 ** 8]))
-        self._check_results(expected_top_k=expected_top_k,
-                            expected_log_probs=expected_log_probs,
-                            beam_search=beam_search,
-                            step=take_linear_chain_step)
-
-        # Prevent repeat trigrams
-        beam_search = BeamSearch(self.vocab, beam_size=2, max_steps=10, end_symbol=self.end_symbol,
-                                 disallow_repeated_ngrams=3)
-        expected_top_k = np.array([[1, 1, 1, 2, 2, 2, 3, 3, 3, 4],
-                                   [2, 2, 2, 3, 3, 3, 4, 4, 4, 5]])
-        expected_log_probs = np.log(np.array([0.1 ** 3 * 0.9 ** 7,
-                                              0.1 ** 4 * 0.9 ** 6]))
-        self._check_results(expected_top_k=expected_top_k,
-                            expected_log_probs=expected_log_probs,
-                            beam_search=beam_search,
-                            step=take_linear_chain_step)
-
-        # Prevent repeat trigrams except "3 3 3"
-        beam_search = BeamSearch(self.vocab, beam_size=2, max_steps=10, end_symbol=self.end_symbol,
-                                 disallow_repeated_ngrams=3, repeated_ngrams_exceptions=[["3", "3", "3"]])
-        expected_top_k = np.array([[1, 1, 1, 2, 2, 2, 3, 3, 3, 3],
-                                   [2, 2, 2, 3, 3, 3, 3, 3, 3, 3]])
-        expected_log_probs = np.log(np.array([0.1 ** 2 * 0.9 ** 8,
-                                              0.1 ** 2 * 0.9 ** 8]))
-        self._check_results(expected_top_k=expected_top_k,
-                            expected_log_probs=expected_log_probs,
-                            beam_search=beam_search,
-                            step=take_linear_chain_step)
+        for num_steps in range(1, 5):
+            actual_reconstructed = \
+                self.beam_search._reconstruct_predictions(predictions, backpointers, num_steps=num_steps)
+            assert torch.equal(reconstructed_predictions[:, :, -num_steps:], actual_reconstructed)
 
     def test_disallow_repeated_ngrams_errors(self):
         # Inconsistent disallowed length and exception length
