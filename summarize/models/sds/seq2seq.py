@@ -43,15 +43,7 @@ class Seq2SeqModel(Model):
         The bridge layer to use in between the encoder final state and the
         initial decoder hidden state. If ``None``, no layer will be used.
     beam_search: ``BeamSearch``
-        The ``BeamSearch`` object to use for prediction and validation unless
-        ``validation_beam_search`` is specified.
-    validation_beam_search: ``BeamSearch``, optional (default = ``None``)
-        Overrides the ``BeamSearch`` object to use for validation. Specifically,
-        this is used when the ground-truth summaries are not provided as input
-        to ``forward``, so care needs to be taken to ensure this is true during
-        prediction. This option may be necessary for when inference is expensive
-        and you do not want to run the full inference during validation while
-        training. If ``None``, defaults to ``beam_search``.
+        The ``BeamSearch`` object to use for prediction and validation.
     summary_token_embedder: ``TokenEmbedder``, optional (default = ``None``)
         The ``TokenEmbedder`` that will embed the summary tokens. If ``None``, the
         ``document_token_embedder``'s embedder for the ``"tokens"`` will be used.
@@ -80,7 +72,6 @@ class Seq2SeqModel(Model):
                  decoder: RNN,
                  bridge: Bridge,
                  beam_search: BeamSearch,
-                 validation_beam_search: Optional[BeamSearch] = None,
                  summary_token_embedder: Optional[TokenEmbedder] = None,
                  summary_namespace: str = 'tokens',
                  use_input_feeding: bool = False,
@@ -97,7 +88,6 @@ class Seq2SeqModel(Model):
         self.decoder = decoder
         self.bridge = bridge
         self.beam_search = beam_search
-        self.validation_beam_search = validation_beam_search or beam_search
         self.summary_token_embedder = summary_token_embedder or document_token_embedder._token_embedders['tokens']
         self.summary_namespace = summary_namespace
         self.use_input_feeding = use_input_feeding
@@ -538,9 +528,7 @@ class Seq2SeqModel(Model):
             loss = cross_entropy
         return loss, cross_entropy
 
-    def _run_inference(self,
-                       initial_decoding_state: Dict[str, torch.Tensor],
-                       beam_search: BeamSearch) -> Tuple[torch.Tensor, torch.Tensor]:
+    def _run_inference(self, initial_decoding_state: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Runs inference given the initial decoder state. Beam search is
         implemented using AllenNLP's generic beam search logic.
@@ -549,8 +537,6 @@ class Seq2SeqModel(Model):
         ----------
         initial_decoding_state: ``Dict[str, torch.Tensor]``
             The initial decoding state.
-        beam_search: ``BeamSearch``
-            The ``BeamSearch`` object to use for inference.
 
         Returns
         -------
@@ -569,7 +555,7 @@ class Seq2SeqModel(Model):
         # shape: (batch_size, beam_size, max_output_length)
         # shape: (batch_size, beam_size)
         predictions, log_probabilities = \
-            beam_search.search(initial_predictions, initial_decoding_state, self._decoder_step)
+            self.beam_search.search(initial_predictions, initial_decoding_state, self._decoder_step)
         return predictions, log_probabilities
 
     def _update_metrics(self,
@@ -649,10 +635,9 @@ class Seq2SeqModel(Model):
 
         # If we aren't training, then we need to do inference
         if not self.training:
-            beam_search = self.beam_search if summary is None else self.validation_beam_search
             # shape: (batch_size, beam_size, max_output_length)
             # shape: (batch_size, beam_size)
-            predictions, log_probabilities = self._run_inference(initial_decoding_state, beam_search)
+            predictions, log_probabilities = self._run_inference(initial_decoding_state)
             output_dict['predictions'] = predictions
             output_dict['log_probabilities'] = log_probabilities
             self._update_metrics(predictions, metadata)

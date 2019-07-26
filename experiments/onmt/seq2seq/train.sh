@@ -14,4 +14,6 @@ fi
 allennlp train \
   --include-package summarize \
   --serialization-dir ${model_dir} \
+  --overrides '{"model.beam_search.disallow_repeated_ngrams": null, "model.beam_search.repeated_ngrams_exceptions": null, "model.beam_search.length_penalizer": null, "model.beam_sea
+rch.coverage_penalizer": null}' \
   ${model_config}

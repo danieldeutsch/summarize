@@ -107,11 +107,6 @@ local hidden_size = 512;
         "beta": 5
       }
     },
-    "validation_beam_search": {
-      "beam_size": 10,
-      "min_steps": 35,
-      "max_steps": 100
-    },
     "metrics": [
       {
         "type": "python-rouge",
