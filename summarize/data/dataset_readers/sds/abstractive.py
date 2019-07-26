@@ -62,7 +62,7 @@ class AbstractiveDatasetReader(DatasetReader):
                 yield self.text_to_instance(document, summary=summary)
 
     @overrides
-    def text_to_instance(self, document: List[str], summary: Optional[List[str]]) -> Instance:
+    def text_to_instance(self, document: List[str], summary: Optional[List[str]] = None) -> Instance:
         """
         Parameters
         ----------
