@@ -53,7 +53,7 @@ for split in valid test; do
     --batch-size 16 \
     --silent \
     --use-dataset-reader \
-    --overrides '{model.beam_search.coverage_penalizer": null}' \
+    --overrides '{"model.beam_search.coverage_penalizer": null}' \
     ${model_file} \
     https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/${split}.tokenized.v1.0.jsonl.gz
 
