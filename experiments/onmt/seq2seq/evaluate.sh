@@ -10,6 +10,7 @@ for split in valid test; do
       https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/${split}.tokenized.v1.0.jsonl.gz \
       ${output_dir}/${split}.${constraints}.jsonl \
       --silent \
+      --compute-rouge-l \
       --output-file ${results_dir}/${split}.${constraints}.metrics.json
   done
 done
