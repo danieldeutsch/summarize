@@ -5,7 +5,7 @@ sentence delimiters from the output.
 """
 # Edit the system path so the summarize library can be imported
 import sys
-sys.path.append('../..')
+sys.path.append('.')
 
 import argparse
 import json
@@ -21,7 +21,7 @@ def main(args):
                 line = line.replace('<t>', '').replace('</t>', '')
                 line = ' '.join(line.split())
                 summary = [line]
-                out.write(json.dumps({'summary': summary}) + '\n')
+                out.write({'summary': summary})
 
 
 if __name__ == '__main__':
