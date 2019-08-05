@@ -85,6 +85,10 @@ local hidden_size = 512;
       "num_layers": 1,
       "activations": "linear"
     },
+    "generate_probability_function": {
+      "type": "onmt",
+      "decoder_dim": hidden_size
+    },
     "decoder": {
       "type": "lstm",
       "input_size": embed_size + hidden_size,

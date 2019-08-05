@@ -92,6 +92,12 @@ local summary_namespace = "summary_tokens";
       "input_size": 10,
       "hidden_size": 40
     },
+    "generate_probability_function": {
+      "type": "see2017",
+      "embedding_dim": 10,
+      "encoder_dim": 40,
+      "decoder_dim": 40
+    },
     "use_input_feeding": true,
     "input_feeding_projection_layer": {
       "input_dim": 10 + 40,

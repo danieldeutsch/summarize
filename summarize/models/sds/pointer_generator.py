@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from summarize.common.util import COPY_SYMBOL, SENT_START_SYMBOL, SENT_END_SYMBOL
 from summarize.modules.bridge import Bridge
 from summarize.modules.coverage_matrix_attention import CoverageMatrixAttention
+from summarize.modules.generate_probability_functions import GenerateProbabilityFunction
 from summarize.modules.rnns import RNN
 from summarize.nn.beam_search import BeamSearch
 
@@ -45,6 +46,8 @@ class PointerGeneratorModel(Model):
     bridge: ``Bridge``, optional (default = ``None``)
         The bridge layer to use in between the encoder final state and the
         initial decoder hidden state. If ``None``, no layer will be used.
+    generate_probability_function: ``GenerateProbabilityFunction``
+        The function which will be used to compute p_gen.
     beam_search: ``BeamSearch``
         The ``BeamSearch`` object to use for prediction and validation unless
         ``validation_beam_search`` is specified.
@@ -85,6 +88,7 @@ class PointerGeneratorModel(Model):
                  attention_layer: FeedForward,
                  decoder: RNN,
                  bridge: Bridge,
+                 generate_probability_function: GenerateProbabilityFunction,
                  beam_search: BeamSearch,
                  validation_beam_search: Optional[BeamSearch] = None,
                  summary_token_embedder: Optional[TokenEmbedder] = None,
@@ -103,23 +107,20 @@ class PointerGeneratorModel(Model):
         self.attention_layer = attention_layer
         self.decoder = decoder
         self.bridge = bridge
+        self.generate_probability_function = generate_probability_function
         self.beam_search = beam_search
         self.validation_beam_search = validation_beam_search or beam_search
         self.summary_token_embedder = summary_token_embedder or document_token_embedder._token_embedders['tokens']
         self.summary_namespace = summary_namespace
         self.use_input_feeding = use_input_feeding
         self.input_feeding_projection_layer = input_feeding_projection_layer
+
         self.loss_normalization = loss_normalization
         self.coverage_loss_weight = coverage_loss_weight
         # The ``output_layer`` is applied after the attention context and decoder
         # hidden state are combined. It is used to calculate the softmax over the
         # summary vocabulary
         self.output_layer = torch.nn.Linear(decoder.get_output_dim(), vocab.get_vocab_size(summary_namespace))
-
-        # Computing the probability of generating versus copying has its own parameters
-        self.p_gen_context_layer = torch.nn.Linear(encoder.get_output_dim(), 1)
-        self.p_gen_hidden_layer = torch.nn.Linear(decoder.get_output_dim(), 1)
-        self.p_gen_input_layer = torch.nn.Linear(decoder.get_input_dim(), 1)
 
         # Retrieve some special vocabulary token indices. Some of them are
         # required to exist.
@@ -631,7 +632,8 @@ class PointerGeneratorModel(Model):
 
         # Compute the soft switch that decides whether to copy or generate
         # shape: (batch_size, num_summary_tokens)
-        p_gen = self._compute_p_gen(attention_context, original_decoder_outputs, input_embeddings)
+        p_gen = self.generate_probability_function(input_embeddings, original_decoder_outputs,
+                                                   decoder_outputs, attention_context)
 
         # At this point in the code, the logic switches depending on if
         # we are computing the loss or doing inference because we can efficiently
@@ -780,48 +782,6 @@ class PointerGeneratorModel(Model):
 
         return decoder_outputs, projected_hidden, hidden, attention_probabilities, attention_context, \
             coverage_vectors, last_coverage_vector
-
-    def _compute_p_gen(self,
-                       attention_context: torch.Tensor,
-                       decoder_outputs: torch.Tensor,
-                       input_embeddings: torch.Tensor) -> torch.Tensor:
-        """
-        Computes the soft switch between generating and copying.
-
-        Parameters
-        ----------
-        attention_context: (batch_size, num_summary_tokens, encoder_hidden_size)
-            The attention context
-        decoder_outputs: (batch_size, num_summary_tokens, decoder_hidden_size)
-            The decoder outputs. According to See et al. (2017), these should be
-            directly from the RNN and not after the attention projection.
-        input_embeddings: (batch_size, num_summary_tokens, embedding_dim)
-            The inputs to the decoder
-
-        Returns
-        -------
-        torch.Tensor: (batch_size, num_summary_tokens)
-            The probability of generating.
-        """
-        # shape: (batch_size, num_summary_tokens)
-        context_score = self.p_gen_context_layer(attention_context).squeeze(2)
-        # shape: (batch_size, num_summary_tokens)
-        hidden_score = self.p_gen_hidden_layer(decoder_outputs).squeeze(2)
-        # shape: (batch_size, num_summary_tokens)
-        input_score = self.p_gen_input_layer(input_embeddings).squeeze(2)
-        # shape: (batch_size, num_summary_tokens)
-        probability = torch.sigmoid(context_score + hidden_score + input_score)
-
-        # In my experience, the generation probability can sometimes be equal
-        # to 1.0 or 0.0 (with really large/small scores) even with reasonably sized
-        # parameter values. This causes problems with the log which is called
-        # later on. Therefore, we move the probability closer to 0.5 by a small
-        # number for stability.
-        # shape: (batch_size, num_summary_tokens)
-        geq_one_half_mask = (probability >= 0.5).float()
-        # shape: (batch_size, num_summary_tokens)
-        probability = (probability - 1e-3) * (geq_one_half_mask) + (probability + 1e-3) * (1 - geq_one_half_mask)
-        return probability
 
     def _compute_full_log_softmax(self,
                                   logits: torch.Tensor,
