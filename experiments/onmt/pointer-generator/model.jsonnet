@@ -74,10 +74,13 @@ local hidden_size = 512;
       ]
     },
     "attention": {
-      "type": "mlp",
-      "encoder_size": hidden_size,
-      "decoder_size": hidden_size,
-      "attention_size": hidden_size
+      "type": "matrix-attention",
+      "matrix_attention": {
+        "type": "mlp",
+        "encoder_size": hidden_size,
+        "decoder_size": hidden_size,
+        "attention_size": hidden_size
+      }
     },
     "attention_layer": {
       "input_dim": hidden_size + hidden_size,
