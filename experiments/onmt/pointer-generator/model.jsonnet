@@ -134,7 +134,8 @@ local hidden_size = 512;
   "validation_iterator": {
     "type": "bucket",
     "batch_size": 16,
-    "sorting_keys": [["document", "num_tokens"]]
+    "sorting_keys": [["document", "num_tokens"]],
+    "instances_per_epoch": 2000
   },
   "trainer": {
     "optimizer": {
