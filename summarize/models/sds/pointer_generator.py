@@ -305,10 +305,10 @@ class PointerGeneratorModel(Model):
         # shape: (batch_size, num_summary_tokens - 1)
         log_p_copy = torch.log(1.0 - p_gen)
         # shape: (batch_size, num_summary_tokens - 1)
-        combined_losses = torch.stack([log_p_gen + vocab_log_probs,
-                                       log_p_copy + copy_log_probs], dim=2)
+        combined_log_probs = torch.stack([log_p_gen + vocab_log_probs,
+                                          log_p_copy + copy_log_probs], dim=2)
         # shape: (batch_size, num_summary_tokens - 1)
-        nll_losses = -torch.logsumexp(combined_losses, dim=2)
+        nll_losses = -torch.logsumexp(combined_log_probs, dim=2)
 
         if self.coverage_loss_weight > 0.0:
             # shape: (batch_size, num_summary_tokens - 1)
