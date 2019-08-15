@@ -115,6 +115,15 @@ class PointerGeneratorDatasetReader(DatasetReader):
         """
         fields = {}
 
+        # There is some weirdness that can happen if the document tokens are lowercased
+        # but the summary tokens are not (or vice versa). We will deal with that when
+        # it's necessary. For now, we don't allow it.
+        assert self.document_token_indexers['tokens'].lowercase_tokens == self.summary_token_indexers['tokens'].lowercase_tokens
+        if self.document_token_indexers['tokens'].lowercase_tokens:
+            document = [sentence.lower() for sentence in document]
+            if summary is not None:
+                summary = [sentence.lower() for sentence in summary]
+
         # Setup the document field
         tokenized_document = self.document_tokenizer.tokenize(document)
         if self.max_document_length is not None:
