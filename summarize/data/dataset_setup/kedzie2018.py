@@ -47,11 +47,11 @@ def main(args):
                 for instance in tqdm(f):
                     batch.append(instance)
                     if len(batch) == _BATCH_SIZE:
-                        _process_batch(parallel, batch, args.max_words, python_rouge, out)
+                        _process_batch(parallel, batch, args.max_tokens, python_rouge, out)
                         batch.clear()
 
                 if batch:
-                    _process_batch(parallel, batch, args.max_words, python_rouge, out)
+                    _process_batch(parallel, batch, args.max_tokens, python_rouge, out)
 
 
 if __name__ == '__main__':
