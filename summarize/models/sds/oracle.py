@@ -12,9 +12,9 @@ from summarize.metrics.rouge import \
 def get_greedy_oracle_summary(document: List[str],
                               summary: Union[List[str], List[List[str]]],
                               metric: str,
-                              max_sentences: Optional[int],
-                              max_tokens: Optional[int],
-                              max_bytes: Optional[int],
+                              max_sentences: Optional[int] = None,
+                              max_tokens: Optional[int] = None,
+                              max_bytes: Optional[int] = None,
                               use_porter_stemmer: bool = True,
                               remove_stopwords: bool = False,
                               python_rouge: Optional[PythonRouge] = None) -> Tuple[List[str], List[int]]:
