@@ -5,9 +5,10 @@ mkdir -p ${output_dir}
 mkdir -p ${results_dir}
 
 for split in valid test; do
-  python -m summarize.utils.extract_summary_from_labels \
+  python -m summarize.models.sds.lead \
     data/kedzie2018/cnn-dailymail/${split}.jsonl.gz \
-    ${output_dir}/${split}.jsonl
+    ${output_dir}/${split}.jsonl \
+    --max-tokens 100
 
   python -m summarize.metrics.rouge \
     data/kedzie2018/cnn-dailymail/${split}.jsonl.gz \
