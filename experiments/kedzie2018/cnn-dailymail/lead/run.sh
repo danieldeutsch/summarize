@@ -6,12 +6,12 @@ mkdir -p ${results_dir}
 
 for split in valid test; do
   python -m summarize.models.sds.lead \
-    data/kedzie2018/cnn-dailymail/${split}.jsonl.gz \
+    https://s3.amazonaws.com/danieldeutsch/summarize/data/kedzie2018/cnn-dailymail/${split}.v1.0.jsonl.gz \
     ${output_dir}/${split}.jsonl \
     --max-tokens 100
 
   python -m summarize.metrics.rouge \
-    data/kedzie2018/cnn-dailymail/${split}.jsonl.gz \
+    https://s3.amazonaws.com/danieldeutsch/summarize/data/kedzie2018/cnn-dailymail/${split}.v1.0.jsonl.gz \
     ${output_dir}/${split}.jsonl \
     --silent \
     --max-ngram 2 \

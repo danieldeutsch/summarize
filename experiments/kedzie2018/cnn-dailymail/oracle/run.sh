@@ -6,11 +6,11 @@ mkdir -p ${results_dir}
 
 for split in valid test; do
   python -m summarize.utils.extract_summary_from_labels \
-    data/kedzie2018/cnn-dailymail/${split}.jsonl.gz \
+    https://s3.amazonaws.com/danieldeutsch/summarize/data/kedzie2018/cnn-dailymail/${split}.v1.0.jsonl.gz \
     ${output_dir}/${split}.jsonl
 
   python -m summarize.metrics.rouge \
-    data/kedzie2018/cnn-dailymail/${split}.jsonl.gz \
+    https://s3.amazonaws.com/danieldeutsch/summarize/data/kedzie2018/cnn-dailymail/${split}.v1.0.jsonl.gz \
     ${output_dir}/${split}.jsonl \
     --silent \
     --max-ngram 2 \
