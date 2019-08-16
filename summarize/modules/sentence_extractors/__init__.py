@@ -1,0 +1,2 @@
+from summarize.modules.sentence_extractors.sentence_extractor import SentenceExtractor
+from summarize.modules.sentence_extractors.rnn import RNNSentenceExtractor
