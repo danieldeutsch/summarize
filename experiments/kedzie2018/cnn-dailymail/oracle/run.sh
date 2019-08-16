@@ -2,6 +2,7 @@ expt_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 output_dir="${expt_dir}/output"
 results_dir="${expt_dir}/results"
 mkdir -p ${output_dir}
+mkdir -p ${results_dir}
 
 for split in valid test; do
   python -m summarize.utils.extract_summary_from_labels \
