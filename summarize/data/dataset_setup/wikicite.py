@@ -3,6 +3,7 @@ Preprocesses the original WikiCite dataset by tokenizing all of the text fields.
 """
 import argparse
 import spacy
+from tqdm import tqdm
 
 from summarize.data.dataset_setup.tokenize import tokenize
 from summarize.data.io import JsonlReader, JsonlWriter
@@ -13,7 +14,7 @@ def main(args):
 
     with JsonlWriter(args.output_jsonl) as out:
         with JsonlReader(args.input_jsonl) as f:
-            for instance in f:
+            for instance in tqdm(f):
                 instance['headings'] = [tokenize(nlp, heading) for heading in instance['headings']]
                 for document in instance['documents']:
                     if document['title']:
