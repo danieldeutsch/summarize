@@ -149,6 +149,7 @@ local hidden_size = 512;
       "milestones": std.range(5, 20)
     },
     "grad_norm": 2,
+    "validation_metric": "+R2-F1",
     "num_epochs": 20,
     "cuda_device": 0,
     "shuffle": true
