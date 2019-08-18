@@ -80,8 +80,7 @@ local decoder_input_size =
         "ngram_orders": [2],
         "max_words": 100,
         "remove_stopwords": true
-      },
-      {"type": "binary-f1"}
+      }
     ]
   },
   "iterator": {
