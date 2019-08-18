@@ -68,5 +68,6 @@ if __name__ == '__main__':
     argp = argparse.ArgumentParser()
     argp.add_argument('input_jsonl', help='The input file to preprocess')
     argp.add_argument('output_jsonl', help='The output file')
+    argp.add_argument('--num-cores', type=int, default=1, help='The number of cores to use')
     args = argp.parse_args()
     main(args)
