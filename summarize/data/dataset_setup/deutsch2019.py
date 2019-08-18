@@ -6,7 +6,7 @@ from typing import Dict, List
 from summarize.data.io import JsonlReader, JsonlWriter
 from summarize.metrics.python_rouge import PythonRouge
 from summarize.metrics.rouge import R1_RECALL
-from summarize.models.oracle import get_greedy_oracle_summary
+from summarize.models.sds.oracle import get_greedy_oracle_summary
 
 _BATCH_SIZE = 100
 
