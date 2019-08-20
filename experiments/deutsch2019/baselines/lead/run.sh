@@ -15,6 +15,7 @@ for split in valid test; do
     --gold-summary-field-name cloze \
     --model-summary-field-name cloze \
     --add-wrapping-list \
+    --compute-rouge-l \
     --silent \
     --output-file ${results_dir}/${split}.metrics.json
 done
