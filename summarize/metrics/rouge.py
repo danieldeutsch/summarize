@@ -230,7 +230,7 @@ def main(args):
         raise Exception(f'No output will be written with --silent and no output file')
 
     gold_summaries = _load_summaries(args.gold_summaries, args.gold_summary_field_name, args.add_wrapping_list)
-    model_summaries = _load_summaries(args.model_summaries, args.model_summary_field_name, args.add_ßwrapping_list)
+    model_summaries = _load_summaries(args.model_summaries, args.model_summary_field_name, args.add_wrapping_list)
 
     metrics = run_rouge(gold_summaries,
                         model_summaries,
