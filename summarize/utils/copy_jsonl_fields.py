@@ -7,9 +7,10 @@ def main(args):
     with JsonlWriter(args.output_jsonl) as out:
         with JsonlReader(args.source_jsonl) as source:
             with JsonlReader(args.target_jsonl) as target:
-                for field in args.field_names:
-                    target[field] = source[field]
-                out.write(target)
+                for source_instance, target_instance in zip(source, target):
+                    for field in args.field_names:
+                        target_instance[field] = source_instance[field]
+                    out.write(target_instance)
 
 
 if __name__ == '__main__':
