@@ -252,6 +252,9 @@ if __name__ == '__main__':
     argp.add_argument('--gold-summary-field-name', default='summary',
                       help='The field name in the gold json for the summaries (e.g., "summary" for '
                            'single reference or "summaries" for multi-reference).')
+    argp.add_argument('--model-summary-field-name', default='summary',
+                      help='The field name in the model json for the summaries (e.g., "summary" for '
+                           'single reference or "summaries" for multi-reference).')
     argp.add_argument('--silent', action='store_true',
                       help='Indicates nothing should be written to stdout.')
     argp.add_argument('--max-ngram', type=int, default=4,
@@ -273,5 +276,8 @@ if __name__ == '__main__':
     argp.add_argument('--compute-rouge-l', action='store_true',
                       help='Indicates that Rouge-L should be computed.')
     argp.set_defaults(compute_rouge_l=False)
+    argp.add_argument('--add-wrapping-list', action='store_true',
+                      help='Indicates that the loaded summary should be enclosed in a list, '
+                           'useful for when the summary is a raw string')
     args = argp.parse_args()
     main(args)
