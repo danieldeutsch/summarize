@@ -8,7 +8,7 @@ local parse_boolean(x) =
 local use_topics = parse_boolean(std.extVar("USE_TOPICS"));
 local use_context = parse_boolean(std.extVar("USE_CONTEXT"));
 
-local embed_size = 100;
+local embed_size = 200;
 local sentence_encoder_size = 512;
 local topic_encoder_size = embed_size;
 local context_encoder_size = sentence_encoder_size;
@@ -35,12 +35,15 @@ local decoder_hidden_size = 600;
   },
   "vocabulary": {
     "pretrained_files": {
-      "tokens": "https://s3-us-west-2.amazonaws.com/allennlp/datasets/glove/glove.6B.100d.txt.gz"
+      "tokens": "(http://nlp.stanford.edu/data/glove.6B.zip)#glove.6B.200d.txt"
     },
     "only_include_pretrained_words": true
   },
   "train_data_path": "https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/train.v1.0.jsonl.gz",
   "validation_data_path": "https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/valid.v1.0.jsonl.gz",
+  "test_data_path": "https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/test.v1.0.jsonl.gz",
+  // We can look at the test data because we only use pretrained words in the vocabulary
+  "dataset_for_vocab_creation": ["train", "valid", "test"],
   "model": {
     "type": "cloze-extractive-baseline",
     "use_topics": use_topics,
@@ -51,14 +54,14 @@ local decoder_hidden_size = 600;
           "type": "embedding",
           "embedding_dim": embed_size,
           "trainable": false,
-          "pretrained_file": "https://s3-us-west-2.amazonaws.com/allennlp/datasets/glove/glove.6B.100d.txt.gz"
+          "pretrained_file": "(http://nlp.stanford.edu/data/glove.6B.zip)#glove.6B.200d.txt"
         }
       }
     },
     "sentence_encoder": {
       "type": "gru",
       "input_size": embed_size,
-      "hidden_size": topic_encoder_size / 2,
+      "hidden_size": sentence_encoder_size / 2,
       "bidirectional": true
     },
     "topic_encoder": {
