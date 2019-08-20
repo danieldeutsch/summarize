@@ -7,6 +7,7 @@ for split in valid test; do
   python -m summarize.models.cloze.oracle \
     https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/${split}.v1.0.jsonl.gz \
     ${output_dir}/${split}.jsonl \
+    R1-F1 \
     --max-sentences 1 \
     --cloze-only
 
