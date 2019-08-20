@@ -43,7 +43,7 @@ local decoder_hidden_size = 600;
   "validation_data_path": "https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/valid.v1.0.jsonl.gz",
   "test_data_path": "https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/test.v1.0.jsonl.gz",
   // We can look at the test data because we only use pretrained words in the vocabulary
-  "dataset_for_vocab_creation": ["train", "valid", "test"],
+  "datasets_for_vocab_creation": ["train", "valid", "test"],
   "model": {
     "type": "cloze-extractive-baseline",
     "use_topics": use_topics,
