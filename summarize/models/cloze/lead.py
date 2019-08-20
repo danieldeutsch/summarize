@@ -24,6 +24,7 @@ if __name__ == '__main__':
     argp.add_argument('output_jsonl', help='The output file')
     argp.add_argument('--max-sentences', type=int, help='The number of sentences to take')
     argp.add_argument('--max-tokens', type=int, help='The number of tokens to take')
+    argp.add_argument('--max-bytes', type=int, help='The number of bytes to take')
     argp.add_argument('--field-name', default='cloze', help='The name of the output field')
     argp.add_argument('--keep-sentences', action='store_true', help='Indicates if the output field should be left as sentences or flattened')
     args = argp.parse_args()
