@@ -23,11 +23,16 @@ RL_RECALL, RL_PRECISION, RL_F1 = 'RL-R', 'RL-P', 'RL-F1'
 logger = logging.getLogger(__name__)
 
 
-def _load_summaries(file_path: str, field_name: str = 'summary') -> Union[List[List[str]], List[List[List[str]]]]:
+def _load_summaries(file_path: str,
+                    field_name: str = 'summary',
+                    add_wrapping_list: bool = False) -> Union[List[List[str]], List[List[List[str]]]]:
     summaries = []
     with JsonlReader(cached_path(file_path)) as f:
         for data in f:
-            summaries.append(data[field_name])
+            summary = data[field_name]
+            if add_wrapping_list:
+                summary = [summary]
+            summaries.append(summary)
     return summaries
 
 
@@ -224,8 +229,8 @@ def main(args):
     if args.silent and not args.output_file:
         raise Exception(f'No output will be written with --silent and no output file')
 
-    gold_summaries = _load_summaries(args.gold_summaries, args.gold_summary_field_name)
-    model_summaries = _load_summaries(args.model_summaries)
+    gold_summaries = _load_summaries(args.gold_summaries, args.gold_summary_field_name, args.add_wrapping_list)
+    model_summaries = _load_summaries(args.model_summaries, args.model_summary_field_name, args.add_ßwrapping_list)
 
     metrics = run_rouge(gold_summaries,
                         model_summaries,
