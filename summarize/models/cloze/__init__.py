@@ -1,0 +1,1 @@
+from summarize.models.cloze.extractive_baseline import ClozeExtractiveBaselineModel
