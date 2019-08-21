@@ -9,7 +9,7 @@ local use_topics = parse_boolean(std.extVar("USE_TOPICS"));
 local use_context = parse_boolean(std.extVar("USE_CONTEXT"));
 
 local embed_size = 200;
-local sentence_encoder_size = 512;
+local sentence_encoder_size = embed_size;
 local topic_encoder_size = embed_size;
 local context_encoder_size = sentence_encoder_size;
 local decoder_hidden_size = 600;
@@ -59,10 +59,9 @@ local decoder_hidden_size = 600;
       }
     },
     "sentence_encoder": {
-      "type": "gru",
-      "input_size": embed_size,
-      "hidden_size": sentence_encoder_size / 2,
-      "bidirectional": true
+      "type": "bag_of_embeddings",
+      "embedding_dim": embed_size,
+      "averaged": true
     },
     "topic_encoder": {
       "type": "bag_of_embeddings",
