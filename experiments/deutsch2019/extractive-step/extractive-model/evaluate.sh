@@ -18,7 +18,7 @@ fi
 
 expt_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 output_dir=${expt_dir}/output/${topics_dir}/${context_dir}
-results_dir=${expt_dir}/output/${topics_dir}/${context_dir}
+results_dir=${expt_dir}/results/${topics_dir}/${context_dir}
 mkdir -p ${results_dir}
 
 for split in valid test; do
