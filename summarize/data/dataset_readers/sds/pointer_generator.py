@@ -1,4 +1,3 @@
-import numpy as np
 from allennlp.common.file_utils import cached_path
 from allennlp.data import DatasetReader, Instance
 from allennlp.data.fields import MetadataField, NamespaceSwappingField, TextField
