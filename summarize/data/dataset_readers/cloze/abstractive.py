@@ -22,7 +22,7 @@ class AbstractiveClozeDatasetReader(DatasetReader):
         The token indexers used for the document tokens.
     topic_token_indexers: optional (default = ``document_token_indexers``).
         The token indexers used for the topic tokens.
-    context_token_indexers: optional (default = ``document_token_indexers``).
+    context_token_indexers: optional (default = ``cloze_token_indexers``).
         The token indexers used for the context tokens.
     cloze_token_indexers: optional (default = ``document_token_indexers``).
         The token indexers used for the cloze tokens.
@@ -32,7 +32,7 @@ class AbstractiveClozeDatasetReader(DatasetReader):
         The tokenizer for the topics.
     context_tokenizer: optional (default = ``document_tokenizer``).
         The tokenizer for the context.
-    cloze_tokenizer: optional (default = ``topic_tokenizer``).
+    cloze_tokenizer: optional (default = ``WordTokenizer``).
         The tokenizer for the cloze.
     max_document_length: ``int``, optional (default = ``None``).
         The maximum number of document tokens to use. If ``None``, no truncation is performed. The
@@ -61,12 +61,12 @@ class AbstractiveClozeDatasetReader(DatasetReader):
         super().__init__(lazy)
         self.document_token_indexers = document_token_indexers or {'tokens': SingleIdTokenIndexer()}
         self.topic_token_indexers = topic_token_indexers or self.document_token_indexers
-        self.context_token_indexers = context_token_indexers or self.document_token_indexers
         self.cloze_token_indexers = cloze_token_indexers or self.document_token_indexers
+        self.context_token_indexers = context_token_indexers or self.cloze_token_indexers
         self.document_tokenizer = document_tokenizer or ParagraphWordTokenizer()
         self.topic_tokenizer = topic_tokenizer or WordTokenizer()
         self.context_tokenizer = context_tokenizer or self.document_tokenizer
-        self.cloze_tokenizer = cloze_tokenizer or self.topic_tokenizer
+        self.cloze_tokenizer = cloze_tokenizer or WordTokenizer()
         self.max_document_length = max_document_length
         self.max_context_length = max_context_length
         self.max_cloze_length = max_cloze_length
