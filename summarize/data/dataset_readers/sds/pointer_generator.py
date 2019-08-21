@@ -1,12 +1,12 @@
 import numpy as np
 from allennlp.common.file_utils import cached_path
-from allennlp.data import DatasetReader, Instance, Token
-from allennlp.data.fields import ArrayField, ListField, MetadataField, NamespaceSwappingField, TextField
+from allennlp.data import DatasetReader, Instance
+from allennlp.data.fields import MetadataField, NamespaceSwappingField, TextField
 from allennlp.data.token_indexers import SingleIdTokenIndexer, TokenIndexer
-from collections import defaultdict
 from overrides import overrides
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional
 
+from summarize.data.dataset_readers.util import get_first_indices_field, get_token_mapping_field, get_token_to_index_map
 from summarize.data.io import JsonlReader
 from summarize.data.paragraph_tokenizers import ParagraphTokenizer, ParagraphWordTokenizer
 
@@ -69,40 +69,6 @@ class PointerGeneratorDatasetReader(DatasetReader):
                 summary = data['summary']
                 yield self.text_to_instance(document, summary=summary)
 
-    def _get_token_to_index_map(self, document: List[Token]) -> Dict[str, List[int]]:
-        # Build an index from document token to the index
-        token_to_document_indices = defaultdict(list)
-        for i, token in enumerate(document):
-            token_to_document_indices[str(token)].append(i)
-        return token_to_document_indices
-
-    def _get_document_token_first_indices_field(self,
-                                                document: List[Token],
-                                                token_to_indices: Dict[str, List[int]]) -> Dict[str, int]:
-        first_indices = []
-        for token in document:
-            first_index = token_to_indices[str(token)][0]
-            first_indices.append(first_index)
-        return ArrayField(np.array(first_indices))
-
-    def _get_token_mapping_field(self,
-                                 token_to_document_indices: Dict[str, List[int]],
-                                 summary: List[Token]) -> Tuple[ListField, ListField]:
-        # For every token in the summary, retrieve the list of document positions
-        # where that token is. The mask will indicate which are true indices
-        # and which are invalid
-        summary_token_document_indices = []
-        mask = []
-        for token in summary:
-            indices = token_to_document_indices[str(token)]
-            summary_token_document_indices.append(ArrayField(np.array(indices)))
-            mask.append(ArrayField(np.ones(len(indices))))
-
-        # Convert these into fields
-        summary_token_document_indices_field = ListField(summary_token_document_indices)
-        mask_field = ListField(mask)
-        return summary_token_document_indices_field, mask_field
-
     @overrides
     def text_to_instance(self, document: List[str], summary: Optional[List[str]]) -> Instance:
         """
@@ -135,12 +101,12 @@ class PointerGeneratorDatasetReader(DatasetReader):
         fields['document_in_summary_namespace'] = NamespaceSwappingField(tokenized_document, self.summary_namespace)
 
         # Build a map from token to all of the indices that token appears
-        document_token_to_indices = self._get_token_to_index_map(tokenized_document)
+        document_token_to_indices = get_token_to_index_map(tokenized_document)
 
         # Get a field that, for every document token, has the first index within
         # the document that token appears
         fields['document_token_first_indices'] = \
-            self._get_document_token_first_indices_field(tokenized_document, document_token_to_indices)
+            get_first_indices_field(tokenized_document, document_token_to_indices)
 
         # Setup the summary field, if it exists
         if summary is not None:
@@ -151,7 +117,7 @@ class PointerGeneratorDatasetReader(DatasetReader):
             fields['summary'] = summary_field
 
             summary_token_document_indices_field, mask_field = \
-                self._get_token_mapping_field(document_token_to_indices, tokenized_summary)
+                get_token_mapping_field(document_token_to_indices, tokenized_summary)
             fields['summary_token_document_indices'] = summary_token_document_indices_field
             fields['summary_token_document_indices_mask'] = mask_field
 
