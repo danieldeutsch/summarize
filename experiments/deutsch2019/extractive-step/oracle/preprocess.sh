@@ -14,7 +14,7 @@ for split in train valid test; do
     ${temp_file} \
     https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/${split}.v1.0.jsonl.gz \
     ${preprocess_dir}/${split}.jsonl.gz \
-    document
+    --field-names document document
 
   rm ${temp_file}
 done
