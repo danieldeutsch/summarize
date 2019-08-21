@@ -48,3 +48,23 @@ class TestRNN(unittest.TestCase):
             actual_outputs.append(actual_output)
         actual_outputs = torch.cat(actual_outputs, dim=1)
         assert torch.equal(expected_outputs, actual_outputs)
+
+    def test_no_mask_and_ones_mask_are_identical(self):
+        # Tests to make sure the outputs are identical when using no mask (None)
+        # versus a mask of just ones.
+        batch_size = 30
+        sequence_length = 20
+        input_size = 5
+        hidden_size = 7
+        num_layers = 2
+        bidirectional = False
+
+        input_data, _ = util.get_random_inputs(batch_size, sequence_length, input_size)
+        _, rnn = util.get_rnns('gru', input_size, hidden_size, num_layers, bidirectional)
+        mask = torch.ones(input_data.size()[:-1])
+        hidden = torch.rand(num_layers, batch_size, hidden_size)
+
+        no_mask_outputs, no_mask_hidden = rnn(input_data, None, hidden)
+        masked_outputs, masked_hidden = rnn(input_data, mask, hidden)
+        assert torch.equal(no_mask_outputs, masked_outputs)
+        assert torch.equal(no_mask_hidden, masked_hidden)

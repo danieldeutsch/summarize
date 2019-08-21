@@ -7,7 +7,9 @@ from torch.nn.utils.rnn import PackedSequence, pack_padded_sequence, pad_packed_
 from typing import Tuple, Union
 
 
-def pack_sequence(X: torch.Tensor, mask: torch.Tensor) -> PackedSequence:
+def pack_sequence(X: torch.Tensor,
+                  mask: torch.Tensor,
+                  hidden: Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]] = None) -> PackedSequence:
     """
     Prepares a tensor for input to an RNN.
 
@@ -32,8 +34,17 @@ def pack_sequence(X: torch.Tensor, mask: torch.Tensor) -> PackedSequence:
     seq_lengths = seq_lengths.int().data.tolist()
     X = X[seq_idx]
 
+    if hidden is not None:
+        if isinstance(hidden, torch.Tensor):
+            hidden = hidden[:, seq_idx, :]
+        else:
+            h, c = hidden
+            h = h[:, seq_idx, :]
+            c = c[:, seq_idx, :]
+            hidden = (h, c)
+
     packed = pack_padded_sequence(X, seq_lengths, batch_first=True)
-    return packed
+    return packed, hidden
 
 
 def unpack_sequence(packed_sequence: PackedSequence,

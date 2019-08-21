@@ -72,8 +72,8 @@ class RNN(torch.nn.Module, Registrable):
         if mask is None:
             outputs, hidden = self.rnn(inputs, hidden)
         else:
-            packed_inputs = util.pack_sequence(inputs, mask)
-            packed_outputs, packed_hidden = self.rnn(packed_inputs, hidden)
+            packed_inputs, packed_hidden = util.pack_sequence(inputs, mask, hidden)
+            packed_outputs, packed_hidden = self.rnn(packed_inputs, packed_hidden)
             outputs, hidden = util.unpack_sequence(packed_outputs, packed_hidden, mask)
         return outputs, hidden
 
