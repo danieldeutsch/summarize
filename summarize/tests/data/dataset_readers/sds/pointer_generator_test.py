@@ -1,4 +1,3 @@
-import numpy as np
 import unittest
 from allennlp.data.token_indexers import SingleIdTokenIndexer
 from allennlp.data.tokenizers.word_splitter import JustSpacesWordSplitter
