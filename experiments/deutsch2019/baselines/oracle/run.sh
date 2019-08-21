@@ -17,7 +17,8 @@ for split in valid test; do
       ${output_dir}/${split}.${metric}.jsonl \
       --gold-summary-field-name cloze \
       --model-summary-field-name cloze \
-      --add-wrapping-list \
+      --add-gold-wrapping-list \
+      --add-model-wrapping-list \
       --compute-rouge-l \
       --silent \
       --output-file ${results_dir}/${split}.${metric}.metrics.json

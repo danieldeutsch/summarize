@@ -229,8 +229,8 @@ def main(args):
     if args.silent and not args.output_file:
         raise Exception(f'No output will be written with --silent and no output file')
 
-    gold_summaries = _load_summaries(args.gold_summaries, args.gold_summary_field_name, args.add_wrapping_list)
-    model_summaries = _load_summaries(args.model_summaries, args.model_summary_field_name, args.add_wrapping_list)
+    gold_summaries = _load_summaries(args.gold_summaries, args.gold_summary_field_name, args.add_gold_wrapping_list)
+    model_summaries = _load_summaries(args.model_summaries, args.model_summary_field_name, args.add_model_wrapping_list)
 
     metrics = run_rouge(gold_summaries,
                         model_summaries,
@@ -281,8 +281,11 @@ if __name__ == '__main__':
     argp.add_argument('--compute-rouge-l', action='store_true',
                       help='Indicates that Rouge-L should be computed.')
     argp.set_defaults(compute_rouge_l=False)
-    argp.add_argument('--add-wrapping-list', action='store_true',
-                      help='Indicates that the loaded summary should be enclosed in a list, '
+    argp.add_argument('--add-gold-wrapping-list', action='store_true',
+                      help='Indicates that the loaded gold summaries should be enclosed in a list, '
+                           'useful for when the summary is a raw string')
+    argp.add_argument('--add-model-wrapping-list', action='store_true',
+                      help='Indicates that the loaded model summaries should be enclosed in a list, '
                            'useful for when the summary is a raw string')
     args = argp.parse_args()
     main(args)
