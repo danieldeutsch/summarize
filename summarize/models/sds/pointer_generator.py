@@ -478,7 +478,8 @@ class PointerGeneratorModel(Model):
 
     def _decoder_step(self,
                       summary_tokens: torch.Tensor,
-                      state: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+                      state: Dict[str, torch.Tensor],
+                      token_mask: torch.Tensor = None) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         """
         Runs the decoder one step for every input token. This function implements
         the interface for AllenNLP's generic beam search code. Instead of a ``batch_size``,
@@ -493,6 +494,8 @@ class PointerGeneratorModel(Model):
             is being called during inference and will only run 1 decoder step.
         state: ``Dict[str, torch.Tensor]``
             The current decoder state.
+        token_mask: ``torch.Tensor``, (group_size, num_summary_tokens)
+            An optional mask to apply during the encoding
 
         Returns
         -------
@@ -575,7 +578,7 @@ class PointerGeneratorModel(Model):
                 # shape: (group_size, num_documents_tokens)
                 (original_decoder_outputs, decoder_output, decoder_state, attention_probabilities, attention_context,
                     coverage_vectors, coverage) = \
-                    self._decoder_forward(input_embedding, decoder_state, encoder_outputs, document_mask, coverage)
+                    self._decoder_forward(input_embedding, decoder_state, encoder_outputs, document_mask, coverage, None)
 
                 original_decoder_outputs_list.append(original_decoder_outputs)
                 decoder_outputs.append(decoder_output)
@@ -612,7 +615,7 @@ class PointerGeneratorModel(Model):
             # shape: (group-size, num_document_tokens)
             (original_decoder_outputs, decoder_outputs, decoder_state, attention_probabilities, attention_contexts,
                 coverage_vectors, coverage) = \
-                self._decoder_forward(input_embeddings, decoder_state, encoder_outputs, document_mask, coverage)
+                self._decoder_forward(input_embeddings, decoder_state, encoder_outputs, document_mask, coverage, token_mask)
 
         # Remove the first dimension which is unnecessary as this is only
         # implemented for 1 layer.
@@ -633,7 +636,7 @@ class PointerGeneratorModel(Model):
         # Compute the soft switch that decides whether to copy or generate
         # shape: (batch_size, num_summary_tokens)
         p_gen = self.generate_probability_function(input_embeddings, original_decoder_outputs,
-                                                   decoder_outputs, attention_context)
+                                                   decoder_outputs, attention_contexts)
 
         # At this point in the code, the logic switches depending on if
         # we are computing the loss or doing inference because we can efficiently
@@ -718,7 +721,8 @@ class PointerGeneratorModel(Model):
                          hidden: Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]],
                          encoder_outputs: torch.Tensor,
                          encoder_mask: torch.Tensor,
-                         coverage: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+                         coverage: torch.Tensor,
+                         input_mask: torch.Tensor = None) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Runs the RNN decoder on the input vectors and hidden state and applies
         the attention mechanism.
@@ -735,6 +739,8 @@ class PointerGeneratorModel(Model):
             The document mask.
         coverage: ``torch.Tensor``, ``(batch_size, num_document_tokens)``
             The coverage vector
+        input_mask: ``torch.Tensor``, ``(batch_size, num_summary_tokens)``
+            An optional mask for the summary tokens.
 
         Returns
         -------
@@ -753,15 +759,9 @@ class PointerGeneratorModel(Model):
         last_coverage_vector: ``torch.Tensor``, ``(batch_size, encoder_hidden_size)``
             The coverage vector after computing all of the attention probabilities
         """
-        # Pass the tokens through the decoder. Masking is not necessary because
-        # if this method is used for beam search, anything after <eos> will be
-        # discarded. If it's used for computing the loss, we will ignore anything
-        # after <eos> when computing the loss function. In neither case do we
-        # care about having an incorrect hidden state.
-        #
         # shape: (group_size, num_summary_tokens, decoder_hidden_size)
         # shape: (1, group_size, decoder_hidden_size)
-        decoder_outputs, hidden = self.decoder(input_vectors, None, hidden)
+        decoder_outputs, hidden = self.decoder(input_vectors, input_mask, hidden)
 
         # Incorporate attention
         # shape: (group_size, num_summary_tokens, num_document_tokens)
@@ -950,7 +950,8 @@ class PointerGeneratorModel(Model):
 
     def _update_metrics(self,
                         predictions: torch.Tensor,
-                        metadata: List[Dict[str, Any]]) -> None:
+                        metadata: List[Dict[str, Any]],
+                        summary_field_name: str = 'summary') -> None:
         """
         Updates the metrics based on the predictions and ground-truth summaries.
 
@@ -965,8 +966,8 @@ class PointerGeneratorModel(Model):
         # If we have acess to the ground-truth summaries, then we can
         # compute metrics
         batch_size = predictions.size(0)
-        if 'summary' in metadata[0] and self.metrics is not None:
-            gold_summaries = [metadata[batch]['summary'] for batch in range(batch_size)]
+        if summary_field_name in metadata[0] and self.metrics is not None:
+            gold_summaries = [metadata[batch][summary_field_name] for batch in range(batch_size)]
             # shape: (batch_size, max_output_length)
             model_summaries = predictions[:, 0, :]
             document_tokens = [metadata[batch]['document_tokens'] for batch in range(batch_size)]
@@ -1071,7 +1072,9 @@ class PointerGeneratorModel(Model):
         return output_dict
 
     @overrides
-    def decode(self, output_dict: Dict[str, torch.Tensor]) -> Dict[str, Any]:
+    def decode(self,
+               output_dict: Dict[str, torch.Tensor],
+               summary_field_name: str = 'summary') -> Dict[str, Any]:
         predictions = output_dict.pop('predictions')
         metadata = output_dict.pop('metadata')
         batch_size, beam_size, max_output_length = predictions.size()
@@ -1080,7 +1083,7 @@ class PointerGeneratorModel(Model):
         document_tokens = [metadata[batch]['document_tokens'] for batch in range(batch_size)]
         summaries = self._convert_indices_to_string(top_predictions, document_tokens)
 
-        output_dict['summary'] = summaries
+        output_dict[summary_field_name] = summaries
         return output_dict
 
     @overrides
