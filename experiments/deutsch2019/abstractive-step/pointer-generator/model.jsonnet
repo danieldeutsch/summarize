@@ -125,6 +125,7 @@ local hidden_size = 512;
       "beam_size": 10,
       "max_steps": 100
     },
+    "use_context": use_context,
     "metrics": [
       {
         "type": "python-rouge",
