@@ -1,1 +1,2 @@
 from summarize.models.cloze.extractive_baseline import ClozeExtractiveBaselineModel
+from summarize.models.cloze.seq2seq import ClozeSeq2SeqModel

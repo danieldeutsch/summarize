@@ -236,7 +236,8 @@ class Seq2SeqModel(Model):
 
     def _decoder_step(self,
                       summary_tokens: torch.Tensor,
-                      state: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
+                      state: Dict[str, torch.Tensor],
+                      token_mask: torch.Tensor = None) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         """
         Runs the decoder one step for every input token. This function implements
         the interface for AllenNLP's generic beam search code. Instead of a ``batch_size``,
@@ -251,6 +252,8 @@ class Seq2SeqModel(Model):
             is being called during inference and will only run 1 decoder step.
         state: ``Dict[str, torch.Tensor]``
             The current decoder state.
+        token_mask: ``torch.Tensor``, (group_size, num_summary_tokens)
+            An optional mask to apply during the encoding
 
         Returns
         -------
@@ -318,7 +321,7 @@ class Seq2SeqModel(Model):
                 # shape: (1, group_size, decoder_hidden_size)
                 # shape: (group_size, 1, num_document_tokens)
                 decoder_output, decoder_state, attention_probabilities = \
-                    self._decoder_forward(input_embedding, decoder_state, encoder_outputs, document_mask)
+                    self._decoder_forward(input_embedding, decoder_state, encoder_outputs, document_mask, None)
 
                 # Save the decoder output and attention probabilities
                 decoder_outputs.append(decoder_output)
@@ -337,7 +340,7 @@ class Seq2SeqModel(Model):
             # shape: (1, group_size, decoder_hidden_size)
             # shape: (group-size, num_summary_tokens, num_document_tokens)
             decoder_outputs, decoder_state, attention_probabilities = \
-                self._decoder_forward(summary_token_embeddings, decoder_state, encoder_outputs, document_mask)
+                self._decoder_forward(summary_token_embeddings, decoder_state, encoder_outputs, document_mask, token_mask)
 
         # Remove the first dimension which is unnecessary as this is only
         # implemented for 1 layer.
@@ -403,7 +406,8 @@ class Seq2SeqModel(Model):
                          input_vectors: torch.Tensor,
                          hidden: Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]],
                          encoder_outputs: torch.Tensor,
-                         encoder_mask: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+                         encoder_mask: torch.Tensor,
+                         input_mask: torch.Tensor = None) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Runs the RNN decoder on the input vectors and hidden state and applies
         the attention mechanism.
@@ -418,6 +422,8 @@ class Seq2SeqModel(Model):
             The encoder output states.
         encoder_mask: ``torch.Tensor``, ``(batch_size, num_document_tokens)``
             The document mask.
+        input_mask: ``torch.Tensor``, ``(batch_size, num_summary_tokens)``
+            An optional mask for the summary tokens.
 
         Returns
         -------
@@ -436,7 +442,7 @@ class Seq2SeqModel(Model):
         #
         # shape: (group_size, num_summary_tokens, decoder_hidden_size)
         # shape: (1, group_size, decoder_hidden_size)
-        decoder_outputs, hidden = self.decoder(input_vectors, None, hidden)
+        decoder_outputs, hidden = self.decoder(input_vectors, input_mask, hidden)
 
         # Add in the attention mechanism
         # shape: (group_size, num_summary_tokens, decoder_hidden_size)
@@ -560,7 +566,8 @@ class Seq2SeqModel(Model):
 
     def _update_metrics(self,
                         predictions: torch.Tensor,
-                        metadata: List[Dict[str, Any]]) -> None:
+                        metadata: List[Dict[str, Any]],
+                        summary_field_name: str = 'summary') -> None:
         """
         Updates the metrics based on the predictions and ground-truth summaries.
 
@@ -571,12 +578,14 @@ class Seq2SeqModel(Model):
         metadata: ``List[Dict[str, Any]]``
             The batched metadata. In order to successfully update the metrics, the
             ``"summary"`` must be a key in the metadata.
+        summary_field_name: ``str``
+            The name of the summary field in the metadata
         """
         # If we have acess to the ground-truth summaries, then we can
         # compute metrics
         batch_size = predictions.size(0)
-        if 'summary' in metadata[0] and self.metrics is not None:
-            gold_summaries = [metadata[batch]['summary'] for batch in range(batch_size)]
+        if summary_field_name in metadata[0] and self.metrics is not None:
+            gold_summaries = [metadata[batch][summary_field_name] for batch in range(batch_size)]
             # shape: (batch_size, max_output_length)
             model_summaries = predictions[:, 0, :]
             for metric in self.metrics:
@@ -647,7 +656,9 @@ class Seq2SeqModel(Model):
         return output_dict
 
     @overrides
-    def decode(self, output_dict: Dict[str, torch.Tensor]) -> Dict[str, Any]:
+    def decode(self,
+               output_dict: Dict[str, torch.Tensor],
+               summary_field_name: str = 'summary') -> Dict[str, Any]:
         predictions = output_dict.pop('predictions')
         batch_size, beam_size, max_output_length = predictions.size()
 
@@ -669,7 +680,7 @@ class Seq2SeqModel(Model):
             summary = ' '.join(tokens)
             summaries.append(summary)
 
-        output_dict['summary'] = summaries
+        output_dict[summary_field_name] = summaries
         return output_dict
 
     @overrides
