@@ -434,12 +434,6 @@ class Seq2SeqModel(Model):
         attention_probabilities: ``torch.Tensor``, ``(batch_size, num_summary_tokens, num_document_tokens)``
             The attention probabilities over the document tokens for each summary token
         """
-        # Pass the tokens through the decoder. Masking is not necessary because
-        # if this method is used for beam search, anything after <eos> will be
-        # discarded. If it's used for computing the loss, we will ignore anything
-        # after <eos> when computing the loss function. In neither case do we
-        # care about having an incorrect hidden state.
-        #
         # shape: (group_size, num_summary_tokens, decoder_hidden_size)
         # shape: (1, group_size, decoder_hidden_size)
         decoder_outputs, hidden = self.decoder(input_vectors, input_mask, hidden)
