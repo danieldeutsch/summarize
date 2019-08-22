@@ -1,16 +1,13 @@
 import torch
-import torch.nn.functional as F
-from allennlp.common.util import END_SYMBOL, START_SYMBOL
-from allennlp.data.vocabulary import DEFAULT_PADDING_TOKEN, DEFAULT_OOV_TOKEN, Vocabulary
+from allennlp.data.vocabulary import Vocabulary
 from allennlp.models import Model
 from allennlp.modules import FeedForward, TextFieldEmbedder, TokenEmbedder
 from allennlp.nn import InitializerApplicator, RegularizerApplicator
-from allennlp.nn.util import get_text_field_mask, weighted_sum
-from allennlp.training.metrics import Average, Metric
+from allennlp.nn.util import get_text_field_mask
+from allennlp.training.metrics import Metric
 from overrides import overrides
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional
 
-from summarize.common.util import COPY_SYMBOL, SENT_START_SYMBOL, SENT_END_SYMBOL
 from summarize.models.sds import PointerGeneratorModel
 from summarize.modules.bridge import Bridge
 from summarize.modules.coverage_matrix_attention import CoverageMatrixAttention
