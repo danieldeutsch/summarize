@@ -122,7 +122,6 @@ local decoder_hidden_size = 600;
   "iterator": {
     "type": "bucket",
     "batch_size": 32,
-    "instances_per_epoch": 100000,
     "sorting_keys": [["document", "num_fields"]]
   },
   "validation_iterator": {
@@ -133,15 +132,10 @@ local decoder_hidden_size = 600;
   "trainer": {
     "optimizer": {
       "type": "adam",
-      "lr": 0.001
-    },
-    "learning_rate_scheduler": {
-      "type": "step",
-      "step_size": 5,
-      "gamma": 0.5
+      "lr": 0.0001
     },
     "grad_norm": 5,
-    "num_epochs": 15,
+    "num_epochs": 20,
     "validation_metric": "+R2-R",
     "cuda_device": 0
   }
