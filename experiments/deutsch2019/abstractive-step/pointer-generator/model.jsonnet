@@ -48,7 +48,7 @@ local hidden_size = 512;
     },
     "max_document_length": 200,
     "max_context_length": 100,
-    "max_summary_length": 50
+    "max_cloze_length": 50
   },
   "vocabulary": {
     "max_vocab_size": 50000,
