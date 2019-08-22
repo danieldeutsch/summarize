@@ -125,7 +125,7 @@ class PointerGeneratorClozeDatasetReader(DatasetReader):
         fields['document'] = TextField(tokenized_document, self.document_token_indexers)
 
         # Get the document token indices but in the cloze namespace
-        fields['document_in_summary_namespace'] = NamespaceSwappingField(tokenized_document, self.cloze_namespace)
+        fields['document_in_cloze_namespace'] = NamespaceSwappingField(tokenized_document, self.cloze_namespace)
 
         # Build a map from token to all of the indices that token appears
         document_token_to_indices = get_token_to_index_map(tokenized_document)
