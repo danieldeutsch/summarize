@@ -10,7 +10,6 @@ for split in valid test; do
     --gold-summary-field-name cloze \
     --model-summary-field-name cloze \
     --add-gold-wrapping-list \
-    --add-model-wrapping-list \
     --compute-rouge-l \
     --silent \
     --max-words 200 \
