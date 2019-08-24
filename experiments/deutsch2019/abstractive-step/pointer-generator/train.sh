@@ -8,7 +8,7 @@ fi
 preprocessing_dataset=$1
 use_context=$2
 if [ "${preprocessing_dataset}" == "lead" ]; then
-  preprocess_dir="${expt_dir}../../extractive-step/lead/preprocessed"
+  preprocess_dir="${expt_dir}/../../extractive-step/lead/preprocessed"
 fi
 
 if [ "${use_context}" == "true" ]; then
