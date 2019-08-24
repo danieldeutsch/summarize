@@ -74,3 +74,15 @@ class TestJsonlReader(unittest.TestCase):
             for item in f:
                 actual_data.append(item)
         self.assertEqual(self.data, actual_data)
+
+    def test_read(self):
+        # Write the data to a file
+        temp_file = tempfile.NamedTemporaryFile(suffix='.jsonl')
+        with open(temp_file.name, 'w') as out:
+            for item in self.data:
+                serialzed = json.dumps(item)
+                out.write(serialzed + '\n')
+
+        # Load from file, ensure it is correct
+        actual_data = JsonlReader(temp_file.name).read()
+        self.assertEqual(self.data, actual_data)

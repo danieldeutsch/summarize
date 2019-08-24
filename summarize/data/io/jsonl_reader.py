@@ -2,7 +2,7 @@ import bz2
 import gzip
 import json
 from allennlp.common.file_utils import cached_path
-from typing import Any
+from typing import Any, List
 
 from summarize.data.io.util import is_gz_file
 
@@ -59,3 +59,8 @@ class JsonlReader(object):
 
     def __exit__(self, *args):
         self.file_handler.close()
+
+    def read(self) -> List[Any]:
+        """Reads all of the instances into a list."""
+        with self:
+            return [instance for instance in self]
