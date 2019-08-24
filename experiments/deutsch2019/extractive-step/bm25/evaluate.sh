@@ -6,7 +6,7 @@ mkdir -p ${results_dir}
 for split in valid test; do
   python -m summarize.metrics.rouge \
     https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/${split}.v1.0.jsonl.gz \
-    ${output_dir}/${split}.jsonl \
+    ${output_dir}/${split}.max-words.jsonl \
     --gold-summary-field-name cloze \
     --model-summary-field-name cloze \
     --add-gold-wrapping-list \
@@ -14,5 +14,16 @@ for split in valid test; do
     --compute-rouge-l \
     --silent \
     --max-words 200 \
-    --output-file ${results_dir}/${split}.metrics.json
+    --output-file ${results_dir}/${split}.max-words.metrics.json
+
+  python -m summarize.metrics.rouge \
+    https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/${split}.v1.0.jsonl.gz \
+    ${output_dir}/${split}.max-sents.jsonl \
+    --gold-summary-field-name cloze \
+    --model-summary-field-name cloze \
+    --add-gold-wrapping-list \
+    --add-model-wrapping-list \
+    --compute-rouge-l \
+    --silent \
+    --output-file ${results_dir}/${split}.max-sents.metrics.json
 done
