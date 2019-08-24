@@ -1,3 +1,4 @@
 from summarize.models.cloze.extractive_baseline import ClozeExtractiveBaselineModel
 from summarize.models.cloze.pointer_generator import ClozePointerGeneratorModel
 from summarize.models.cloze.seq2seq import ClozeSeq2SeqModel
+from summarize.models.cloze.open_ai_language_model import OpenAILanguageModel
