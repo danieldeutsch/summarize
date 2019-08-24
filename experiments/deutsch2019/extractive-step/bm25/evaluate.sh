@@ -1,6 +1,6 @@
 expt_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null && pwd )"
 output_dir="${expt_dir}/output"
-results_dir="${expt_dir}/output"
+results_dir="${expt_dir}/results"
 mkdir -p ${results_dir}
 
 for split in valid test; do
