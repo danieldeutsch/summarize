@@ -1,1 +1,2 @@
+from summarize.predictors.cloze.abstractive ClozeAbstractivePredictor
 from summarize.predictors.cloze.extractive import ClozeExtractivePredictor
