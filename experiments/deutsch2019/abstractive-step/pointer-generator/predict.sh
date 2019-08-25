@@ -32,5 +32,5 @@ for split in valid test; do
     --cuda-device 0 \
     --batch-size 16 \
     ${model_file} \
-    preprocess_dir/${split}.jsonl.gz
+    ${preprocess_dir}/${split}.jsonl.gz
 done
