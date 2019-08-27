@@ -13,7 +13,7 @@ local hidden_size = 512;
 {
   "dataset_reader": {
     "type": "cloze-pointer-generator",
-    "lazy": false,
+    "lazy": true,
     "document_tokenizer": {
       "type": "word",
       "word_splitter": {
@@ -98,10 +98,13 @@ local hidden_size = 512;
       ]
     },
     "attention": {
-      "type": "mlp",
-      "encoder_size": hidden_size,
-      "decoder_size": hidden_size,
-      "attention_size": hidden_size
+      "type": "matrix-attention",
+      "matrix_attention": {
+        "type": "mlp",
+        "encoder_size": hidden_size,
+        "decoder_size": hidden_size,
+        "attention_size": hidden_size
+      }
     },
     "attention_layer": {
       "input_dim": hidden_size + hidden_size,
@@ -119,7 +122,7 @@ local hidden_size = 512;
       "hidden_size": hidden_size
     },
     "use_input_feeding": false,
-    "loss_normalization": "summary_length",
+    "loss_normalization": "tokens",
     "coverage_loss_weight": 0.0,
     "beam_search": {
       "beam_size": 10,
@@ -131,16 +134,14 @@ local hidden_size = 512;
         "type": "python-rouge",
         "ngram_orders": [1, 2]
       }
-    ],
-    "initializer": [
-      [".*", {"type": "uniform", "a": -0.1, "b": 0.1}]
     ]
   },
   "iterator": {
     "type": "bucket",
     "batch_size": 16,
     "sorting_keys": [["document", "num_tokens"]],
-    "instances_per_epoch": 160000
+    "instances_per_epoch": 100000,
+    "max_instances_in_memory": 100000
   },
   "validation_iterator": {
     "type": "bucket",
@@ -150,19 +151,12 @@ local hidden_size = 512;
   },
   "trainer": {
     "optimizer": {
-      "type": "adagrad",
-      "lr": 0.15,
-      "initial_accumulator_value": 0.1
+      "type": "adam",
+      "lr": 0.001
     },
-    "learning_rate_scheduler": {
-      "type": "multi_step",
-      "gamma": 0.5,
-      "milestones": std.range(5, 20)
-    },
-    "grad_norm": 2,
+    "grad_norm": 5,
     "validation_metric": "+R2-F1",
-    "num_epochs": 20,
-    "cuda_device": 0,
-    "shuffle": true
+    "num_epochs": 10,
+    "cuda_device": 0
   }
 }
