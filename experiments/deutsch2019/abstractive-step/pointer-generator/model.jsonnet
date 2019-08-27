@@ -126,6 +126,7 @@ local hidden_size = 512;
     "coverage_loss_weight": 0.0,
     "beam_search": {
       "beam_size": 10,
+      "min_steps": 20,
       "max_steps": 100
     },
     "use_context": use_context,
