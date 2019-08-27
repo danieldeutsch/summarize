@@ -9,6 +9,13 @@ preprocessing_dataset=$1
 use_context=$2
 if [ "${preprocessing_dataset}" == "lead" ]; then
   preprocess_dir="${expt_dir}/../../extractive-step/lead/preprocessed"
+elif [ "${preprocessing_dataset}" == "oracle" ]; then
+  preprocess_dir="${expt_dir}/../../extractive-step/oracle/preprocessed"
+elif [ "${preprocessing_dataset}" == "extractive-model" ]; then
+  preprocess_dir="${expt_dir}/../../extractive-step/extractive-model/topics/context"
+else
+  echo "Invalid preprocessing dataset: ${preprocessing_dataset}"
+  exit
 fi
 
 if [ "${use_context}" == "true" ]; then
