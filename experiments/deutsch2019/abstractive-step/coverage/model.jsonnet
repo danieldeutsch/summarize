@@ -14,7 +14,7 @@ local hidden_size = 512;
 {
   "dataset_reader": {
     "type": "cloze-pointer-generator",
-    "lazy": false,
+    "lazy": true,
     "document_tokenizer": {
       "type": "word",
       "word_splitter": {
@@ -114,10 +114,11 @@ local hidden_size = 512;
       "hidden_size": hidden_size
     },
     "use_input_feeding": false,
-    "loss_normalization": "summary_length",
+    "loss_normalization": "tokens",
     "coverage_loss_weight": 1.0,
     "beam_search": {
       "beam_size": 10,
+      "min_steps": 20,
       "max_steps": 100
     },
     "use_context": use_context,
@@ -131,16 +132,24 @@ local hidden_size = 512;
       [".*",
         {
           "type": "pretrained",
-          "weights_file_path": pretrained_dir + "/best.th"
+          "weights_file_path": pretrained_dir + "/best.th",
+          "parameter_name_overrides": {
+            "attention.linear_context.weight": "attention.matrix_attention.linear_context.weight",
+            "attention.linear_query.weight": "attention.matrix_attention.linear_query.weight",
+            "attention.linear_query.bias": "attention.matrix_attention.linear_query.bias",
+            "attention.v.weight": "attention.matrix_attention.v.weight"
+          }
         }
-      ]
+      ],
+      ["attention.coverage_weights.weight", "prevent"]
     ]
   },
   "iterator": {
     "type": "bucket",
     "batch_size": 16,
     "sorting_keys": [["document", "num_tokens"]],
-    "instances_per_epoch": 10000
+    "instances_per_epoch": 10000,
+    "max_instances_in_memory": 10000
   },
   "validation_iterator": {
     "type": "bucket",
@@ -156,7 +165,6 @@ local hidden_size = 512;
     "grad_norm": 5,
     "validation_metric": "+R2-F1",
     "num_epochs": 5,
-    "cuda_device": 0,
-    "shuffle": true
+    "cuda_device": 0
   }
 }
