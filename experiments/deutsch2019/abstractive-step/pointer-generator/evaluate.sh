@@ -12,7 +12,7 @@ if [ "${preprocessing_dataset}" == "lead" ]; then
 elif [ "${preprocessing_dataset}" == "oracle" ]; then
   preprocess_dir="${expt_dir}/../../extractive-step/oracle/preprocessed"
 elif [ "${preprocessing_dataset}" == "extractive-model" ]; then
-  preprocess_dir="${expt_dir}/../../extractive-step/extractive-model/topics/context"
+  preprocess_dir="${expt_dir}/../../extractive-step/extractive-model/preprocessed/topics/context"
 else
   echo "Invalid preprocessing dataset: ${preprocessing_dataset}"
   exit
