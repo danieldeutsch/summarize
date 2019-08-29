@@ -27,7 +27,8 @@ fi
 model_dir=${expt_dir}/model/${preprocessing_dataset}/${context_dir}
 model_file=${model_dir}/model.tar.gz
 output_dir=${expt_dir}/output/${preprocessing_dataset}/${context_dir}
-mkdir -p ${output_dir}
+results_dir=${expt_dir}/results/${preprocessing_dataset}/${context_dir}
+mkdir -p ${output_dir} ${results_dir}
 
 for split in valid test; do
   allennlp predict \
@@ -41,3 +42,10 @@ for split in valid test; do
     ${model_file} \
     ${preprocess_dir}/${split}.jsonl.gz
 done
+
+allennlp evaluate \
+  --include-package summarize \
+  --output-file ${results_dir}/test.evaluate.metrics.json \
+  --cuda-device 0 \
+  ${model_file} \
+  ${preprocess_dir}/test.jsonl.gz
