@@ -47,6 +47,6 @@ allennlp evaluate \
   --include-package summarize \
   --output-file ${results_dir}/test.evaluate.metrics.json \
   --cuda-device 0 \
-  --overrides '{"validation_iterator.instances_per_epoch": null, "model.beam_search.beam_size": 0}' \
+  --overrides '{"validation_iterator.instances_per_epoch": null, "model.beam_search.beam_size": 1}' \
   ${model_file} \
   ${preprocess_dir}/test.jsonl.gz
