@@ -239,8 +239,6 @@ class BeamSearch(FromParams):
                 sorted_indices = sorted_indices.unsqueeze(1).expand_as(final_predictions[i])
                 final_predictions[i] = torch.gather(final_predictions[i], 0, sorted_indices)
 
-        return final_predictions, final_log_probs
-
     def initialize(self, batch_size: int) -> None:
         # List of (batch_size, beam_size) tensors. One for each time step. Does not
         # include the start symbols, which are implicit.
@@ -352,13 +350,16 @@ class BeamSearch(FromParams):
 
         self._update_disallowed_ngrams()
 
+        self.update_state()
+
         # Log probability tensor that mandates that the end token is selected.
         # shape: (batch_size * beam_size, num_classes)
         log_probs_after_end = start_class_log_probabilities.new_full(
             (batch_size * self.beam_size, num_classes),
             float("-inf")
         )
-        log_probs_after_end[:, self._end_index] = 0.
+        if not self.reuse_beam():
+            log_probs_after_end[:, self._end_index] = 0.
 
         # Set the same state for each element in the beam.
         for key, state_tensor in state.items():
@@ -506,6 +507,8 @@ class BeamSearch(FromParams):
 
             self._update_disallowed_ngrams()
 
+            self.update_state()
+
             # Keep only the pieces of the state tensors corresponding to the
             # ancestors created this iteration.
             for key, state_tensor in state.items():
@@ -534,9 +537,19 @@ class BeamSearch(FromParams):
                           RuntimeWarning)
 
         # Reconstruct the sequences using the backpointers
-        final_predictions = self._reconstruct_predictions(self.predictions, self.backpointers)
+        final_predictions, final_log_probs = self.get_final_predictions(last_log_probabilities)
 
         # Use the length penalizer to rerank the predictions if one is provided
-        final_predictions, final_log_probs = self._apply_length_penalty(final_predictions, last_log_probabilities, lengths)
+        self._apply_length_penalty(final_predictions, final_log_probs, lengths)
 
         return final_predictions, final_log_probs
+
+    def reuse_beam(self) -> bool:
+        return False
+
+    def update_state(self) -> None:
+        pass
+
+    def get_final_predictions(self, log_probs: torch.Tensor) -> Tuple[List[List[torch.Tensor]], List[torch.Tensor]]:
+        final_predictions = self._reconstruct_predictions(self.predictions, self.backpointers)
+        return final_predictions, log_probs
