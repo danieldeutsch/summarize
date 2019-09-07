@@ -218,6 +218,29 @@ class BeamSearch(FromParams):
 
         self.disallowed_ngrams = updated_disallowed_ngrams
 
+    def _apply_length_penalty(self,
+                              final_predictions: List[List[torch.Tensor]],
+                              final_log_probs: List[torch.Tensor],
+                              lengths: List[torch.Tensor]) -> Tuple[List[List[torch.Tensor]], List[torch.Tensor]]:
+        if self.length_penalizer is not None:
+            batch_size = len(final_predictions)
+            for i in range(batch_size):
+                # shape: (beam_size)
+                length_penalties = self.length_penalizer(lengths[i])
+                # shape: (beam_size)
+                penalized_scores = final_log_probs[i] / length_penalties
+                # Sort the new scores in descending order
+                # shape: (beam_size)
+                sorted_indices = torch.argsort(penalized_scores, dim=0, descending=True)
+                # Reorder the probabilities
+                final_log_probs[i] = final_log_probs[i][sorted_indices]
+
+                # Reorder the predictions
+                sorted_indices = sorted_indices.unsqueeze(1).expand_as(final_predictions[i])
+                final_predictions[i] = torch.gather(final_predictions[i], 0, sorted_indices)
+
+        return final_predictions, final_log_probs
+
     def initialize(self, batch_size: int) -> None:
         # List of (batch_size, beam_size) tensors. One for each time step. Does not
         # include the start symbols, which are implicit.
@@ -511,22 +534,9 @@ class BeamSearch(FromParams):
                           RuntimeWarning)
 
         # Reconstruct the sequences using the backpointers
-        all_predictions = self._reconstruct_predictions(self.predictions, self.backpointers)
+        final_predictions = self._reconstruct_predictions(self.predictions, self.backpointers)
 
         # Use the length penalizer to rerank the predictions if one is provided
-        if self.length_penalizer is not None:
-            # shape: (batch_size, beam_size)
-            length_penalties = self.length_penalizer(lengths)
-            # shape: (batch_size, beam_size)
-            penalized_scores = last_log_probabilities / length_penalties
-            # Sort the new scores in descending order
-            # shape: (batch_size, beam_size)
-            sorted_indices = torch.argsort(penalized_scores, dim=1, descending=True)
+        final_predictions, final_log_probs = self._apply_length_penalty(final_predictions, last_log_probabilities, lengths)
 
-            # Reorder the probabilities
-            last_log_probabilities = torch.gather(last_log_probabilities, 1, sorted_indices)
-            # Reorder the predictions
-            sorted_indices = sorted_indices.unsqueeze(2).expand_as(all_predictions)
-            all_predictions = torch.gather(all_predictions, 1, sorted_indices)
-
-        return all_predictions, last_log_probabilities
+        return final_predictions, final_log_probs
