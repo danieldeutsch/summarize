@@ -225,6 +225,11 @@ class BeamSearch(FromParams):
 
         return updated_disallowed_ngrams
 
+    def initialize(self, batch_size: int) -> None:
+        # List of (batch_size, beam_size) tensors. One for each time step. Does not
+        # include the start symbols, which are implicit.
+        self.predictions: List[torch.Tensor] = []
+
     def search(self,
                start_predictions: torch.Tensor,
                start_state: StateType,
@@ -279,9 +284,7 @@ class BeamSearch(FromParams):
         """
         batch_size = start_predictions.size()[0]
 
-        # List of (batch_size, beam_size) tensors. One for each time step. Does not
-        # include the start symbols, which are implicit.
-        predictions: List[torch.Tensor] = []
+        self.initialize(batch_size)
 
         # List of (batch_size, beam_size) tensors. One for each time step. None for
         # the first.  Stores the index n for the parent prediction, i.e.
@@ -317,7 +320,7 @@ class BeamSearch(FromParams):
 
         # shape: (batch_size, beam_size), (batch_size, beam_size)
         start_top_log_probabilities, start_predicted_classes = \
-                start_class_log_probabilities.topk(self.beam_size)
+            start_class_log_probabilities.topk(self.beam_size)
         if self.beam_size == 1 and (start_predicted_classes == self._end_index).all():
             warnings.warn("Empty sequences predicted. You may want to increase the beam size or ensure "
                           "your step function is working properly.",
@@ -329,15 +332,15 @@ class BeamSearch(FromParams):
         last_log_probabilities = start_top_log_probabilities
 
         # shape: [(batch_size, beam_size)]
-        predictions.append(start_predicted_classes)
+        self.predictions.append(start_predicted_classes)
 
-        disallowed_ngrams = self._update_disallowed_ngrams(predictions, backpointers, disallowed_ngrams)
+        disallowed_ngrams = self._update_disallowed_ngrams(self.predictions, backpointers, disallowed_ngrams)
 
         # Log probability tensor that mandates that the end token is selected.
         # shape: (batch_size * beam_size, num_classes)
         log_probs_after_end = start_class_log_probabilities.new_full(
-                (batch_size * self.beam_size, num_classes),
-                float("-inf")
+            (batch_size * self.beam_size, num_classes),
+            float("-inf")
         )
         log_probs_after_end[:, self._end_index] = 0.
 
@@ -346,9 +349,9 @@ class BeamSearch(FromParams):
             _, *last_dims = state_tensor.size()
             # shape: (batch_size * beam_size, *)
             state[key] = state_tensor.\
-                    unsqueeze(1).\
-                    expand(batch_size, self.beam_size, *last_dims).\
-                    reshape(batch_size * self.beam_size, *last_dims)
+                unsqueeze(1).\
+                expand(batch_size, self.beam_size, *last_dims).\
+                reshape(batch_size * self.beam_size, *last_dims)
 
         # Maintains the length of each prediction, not including the start
         # or end token
@@ -364,7 +367,7 @@ class BeamSearch(FromParams):
 
         for timestep in range(self.max_steps - 1):
             # shape: (batch_size * beam_size,)
-            last_predictions = predictions[-1].reshape(batch_size * self.beam_size)
+            last_predictions = self.predictions[-1].reshape(batch_size * self.beam_size)
 
             # If the last token was not the end index, we increment the length by 1
             lengths += (last_predictions != self._end_index).long()
@@ -382,18 +385,18 @@ class BeamSearch(FromParams):
             # If the predictions have not reached the minimum length, prevent
             # the end index from being generated. The minimum number of steps
             # doesn't include the start or end index.
-            if self.min_steps is not None and len(predictions) < self.min_steps:
+            if self.min_steps is not None and len(self.predictions) < self.min_steps:
                 class_log_probabilities[:, self._end_index] = float('-inf')
 
             # shape: (batch_size * beam_size, num_classes)
             last_predictions_expanded = last_predictions.unsqueeze(-1).expand(
-                    batch_size * self.beam_size,
-                    num_classes
+                batch_size * self.beam_size,
+                num_classes
             )
 
             # If there are ngrams which are disallowed, we prevent any token
             # which would repeat an ngram from being generated
-            self._mask_disallowed_ngrams(predictions, backpointers, class_log_probabilities, disallowed_ngrams)
+            self._mask_disallowed_ngrams(self.predictions, backpointers, class_log_probabilities, disallowed_ngrams)
 
             # Here we are finding any beams where we predicted the end token in
             # the previous timestep and replacing the distribution with a
@@ -401,9 +404,9 @@ class BeamSearch(FromParams):
             # this timestep as well.
             # shape: (batch_size * beam_size, num_classes)
             cleaned_log_probabilities = torch.where(
-                    last_predictions_expanded == self._end_index,
-                    log_probs_after_end,
-                    class_log_probabilities
+                last_predictions_expanded == self._end_index,
+                log_probs_after_end,
+                class_log_probabilities
             )
 
             # shape (both): (batch_size * beam_size, per_node_beam_size)
@@ -430,20 +433,20 @@ class BeamSearch(FromParams):
             # This lets us maintain the log probability of each element on the beam.
             # shape: (batch_size * beam_size, per_node_beam_size)
             expanded_last_log_probabilities = last_log_probabilities.\
-                    unsqueeze(2).\
-                    expand(batch_size, self.beam_size, self.per_node_beam_size).\
-                    reshape(batch_size * self.beam_size, self.per_node_beam_size)
+                unsqueeze(2).\
+                expand(batch_size, self.beam_size, self.per_node_beam_size).\
+                reshape(batch_size * self.beam_size, self.per_node_beam_size)
 
             # shape: (batch_size * beam_size, per_node_beam_size)
             summed_top_log_probabilities = top_log_probabilities + expanded_last_log_probabilities
 
             # shape: (batch_size, beam_size * per_node_beam_size)
             reshaped_summed = summed_top_log_probabilities.\
-                    reshape(batch_size, self.beam_size * self.per_node_beam_size)
+                reshape(batch_size, self.beam_size * self.per_node_beam_size)
 
             # shape: (batch_size, beam_size * per_node_beam_size)
             reshaped_predicted_classes = predicted_classes.\
-                    reshape(batch_size, self.beam_size * self.per_node_beam_size)
+                reshape(batch_size, self.beam_size * self.per_node_beam_size)
 
             # Keep only the top `beam_size` beam indices.
             # shape: (batch_size, beam_size), (batch_size, beam_size)
@@ -453,7 +456,7 @@ class BeamSearch(FromParams):
             # shape: (batch_size, beam_size)
             restricted_predicted_classes = reshaped_predicted_classes.gather(1, restricted_beam_indices)
 
-            predictions.append(restricted_predicted_classes)
+            self.predictions.append(restricted_predicted_classes)
 
             # shape: (batch_size, beam_size)
             last_log_probabilities = restricted_beam_log_probs
@@ -486,7 +489,7 @@ class BeamSearch(FromParams):
             backpointers.append(backpointer)
 
             # Update the disallowed ngrams
-            disallowed_ngrams = self._update_disallowed_ngrams(predictions, backpointers, disallowed_ngrams)
+            disallowed_ngrams = self._update_disallowed_ngrams(self.predictions, backpointers, disallowed_ngrams)
 
             # Keep only the pieces of the state tensors corresponding to the
             # ancestors created this iteration.
@@ -494,17 +497,17 @@ class BeamSearch(FromParams):
                 _, *last_dims = state_tensor.size()
                 # shape: (batch_size, beam_size, *)
                 expanded_backpointer = backpointer.\
-                        view(batch_size, self.beam_size, *([1] * len(last_dims))).\
-                        expand(batch_size, self.beam_size, *last_dims)
+                    view(batch_size, self.beam_size, *([1] * len(last_dims))).\
+                    expand(batch_size, self.beam_size, *last_dims)
 
                 # shape: (batch_size * beam_size, *)
                 state[key] = state_tensor.\
-                        reshape(batch_size, self.beam_size, *last_dims).\
-                        gather(1, expanded_backpointer).\
-                        reshape(batch_size * self.beam_size, *last_dims)
+                    reshape(batch_size, self.beam_size, *last_dims).\
+                    gather(1, expanded_backpointer).\
+                    reshape(batch_size * self.beam_size, *last_dims)
 
         # Update the length one last time if the last token was not the end, then reshape
-        lengths += (predictions[-1].reshape(batch_size * self.beam_size) != self._end_index).long()
+        lengths += (self.predictions[-1].reshape(batch_size * self.beam_size) != self._end_index).long()
         # shape: (batch_size, beam_size)
         lengths = lengths.view(batch_size, self.beam_size)
 
@@ -516,7 +519,7 @@ class BeamSearch(FromParams):
                           RuntimeWarning)
 
         # Reconstruct the sequences using the backpointers
-        all_predictions = self._reconstruct_predictions(predictions, backpointers)
+        all_predictions = self._reconstruct_predictions(self.predictions, backpointers)
 
         # Use the length penalizer to rerank the predictions if one is provided
         if self.length_penalizer is not None:
