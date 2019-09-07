@@ -230,6 +230,11 @@ class BeamSearch(FromParams):
         # include the start symbols, which are implicit.
         self.predictions: List[torch.Tensor] = []
 
+        # List of (batch_size, beam_size) tensors. One for each time step. None for
+        # the first.  Stores the index n for the parent prediction, i.e.
+        # predictions[t-1][i][n], that it came from.
+        self.backpointers: List[torch.Tensor] = []
+
     def search(self,
                start_predictions: torch.Tensor,
                start_state: StateType,
@@ -286,11 +291,6 @@ class BeamSearch(FromParams):
 
         self.initialize(batch_size)
 
-        # List of (batch_size, beam_size) tensors. One for each time step. None for
-        # the first.  Stores the index n for the parent prediction, i.e.
-        # predictions[t-1][i][n], that it came from.
-        backpointers: List[torch.Tensor] = []
-
         # Dictionaries which map from the prefix of an ngram (the n-1 tokens
         # represented as a tuple of indicies) to the list of indices which are not
         # allowed to appear next. The lists are indexed by batch then beam index.
@@ -334,7 +334,7 @@ class BeamSearch(FromParams):
         # shape: [(batch_size, beam_size)]
         self.predictions.append(start_predicted_classes)
 
-        disallowed_ngrams = self._update_disallowed_ngrams(self.predictions, backpointers, disallowed_ngrams)
+        disallowed_ngrams = self._update_disallowed_ngrams(self.predictions, self.backpointers, disallowed_ngrams)
 
         # Log probability tensor that mandates that the end token is selected.
         # shape: (batch_size * beam_size, num_classes)
@@ -396,7 +396,7 @@ class BeamSearch(FromParams):
 
             # If there are ngrams which are disallowed, we prevent any token
             # which would repeat an ngram from being generated
-            self._mask_disallowed_ngrams(self.predictions, backpointers, class_log_probabilities, disallowed_ngrams)
+            self._mask_disallowed_ngrams(self.predictions, self.backpointers, class_log_probabilities, disallowed_ngrams)
 
             # Here we are finding any beams where we predicted the end token in
             # the previous timestep and replacing the distribution with a
@@ -486,10 +486,10 @@ class BeamSearch(FromParams):
             # shape: (batch_size, beam_size)
             backpointer = restricted_beam_indices / self.per_node_beam_size
 
-            backpointers.append(backpointer)
+            self.backpointers.append(backpointer)
 
             # Update the disallowed ngrams
-            disallowed_ngrams = self._update_disallowed_ngrams(self.predictions, backpointers, disallowed_ngrams)
+            disallowed_ngrams = self._update_disallowed_ngrams(self.predictions, self.backpointers, disallowed_ngrams)
 
             # Keep only the pieces of the state tensors corresponding to the
             # ancestors created this iteration.
@@ -519,7 +519,7 @@ class BeamSearch(FromParams):
                           RuntimeWarning)
 
         # Reconstruct the sequences using the backpointers
-        all_predictions = self._reconstruct_predictions(self.predictions, backpointers)
+        all_predictions = self._reconstruct_predictions(self.predictions, self.backpointers)
 
         # Use the length penalizer to rerank the predictions if one is provided
         if self.length_penalizer is not None:
