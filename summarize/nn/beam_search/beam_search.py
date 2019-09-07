@@ -1,6 +1,6 @@
 import torch
 import warnings
-from allennlp.common import FromParams
+from allennlp.common import Registrable, Params
 from allennlp.common.checks import ConfigurationError
 from allennlp.common.util import END_SYMBOL
 from allennlp.data import Vocabulary
@@ -15,7 +15,7 @@ StateType = Dict[str, torch.Tensor]  # pylint: disable=invalid-name
 StepFunctionType = Callable[[torch.Tensor, StateType], Tuple[torch.Tensor, StateType]]  # pylint: disable=invalid-name
 
 
-class BeamSearch(FromParams):
+class BeamSearchBase(Registrable):
     """
     Implements the beam search algorithm for decoding the most likely sequences.
 
@@ -53,6 +53,8 @@ class BeamSearch(FromParams):
         each prediction at each step of decoding. The sequence log-probabilities
         will be augmented by this score only for selecting the next token.
     """
+    default_implementation = 'standard'
+
     def __init__(self,
                  vocab: Vocabulary,
                  beam_size: int,
@@ -225,17 +227,31 @@ class BeamSearch(FromParams):
         if self.length_penalizer is not None:
             batch_size = len(final_predictions)
             for i in range(batch_size):
+                print()
+                print(final_predictions[i])
+                print(final_log_probs[i])
+                print(lengths[i])
+
                 # shape: (beam_size)
                 length_penalties = self.length_penalizer(lengths[i])
                 # shape: (beam_size)
                 penalized_scores = final_log_probs[i] / length_penalties
+                print('penalized')
+                print(penalized_scores)
                 # Sort the new scores in descending order
                 # shape: (beam_size)
                 sorted_indices = torch.argsort(penalized_scores, dim=0, descending=True)
                 # Reorder the probabilities
                 final_log_probs[i] = final_log_probs[i][sorted_indices]
                 # Reorder the predictions
-                final_predictions[i] = final_predictions[i][sorted_indices]
+                if isinstance(final_predictions[i], torch.Tensor):
+                    final_predictions[i] = final_predictions[i][sorted_indices]
+                else:
+                    final_predictions[i] = [final_predictions[i][index.item()] for index in sorted_indices]
+
+                print(final_predictions[i])
+                print(final_predictions[i])
+                print(final_log_probs[i])
 
     def initialize(self, batch_size: int) -> None:
         # List of (batch_size, beam_size) tensors. One for each time step. Does not
@@ -246,6 +262,10 @@ class BeamSearch(FromParams):
         # the first.  Stores the index n for the parent prediction, i.e.
         # predictions[t-1][i][n], that it came from.
         self.backpointers: List[torch.Tensor] = []
+
+        # Maintains the log-probabilities of the sequences which correspond
+        # to the predictions
+        self.log_probs: List[torch.Tensor] = []
 
         # Dictionaries which map from the prefix of an ngram (the n-1 tokens
         # represented as a tuple of indicies) to the list of indices which are not
@@ -346,6 +366,8 @@ class BeamSearch(FromParams):
         # shape: [(batch_size, beam_size)]
         self.predictions.append(start_predicted_classes)
 
+        self.log_probs.append(last_log_probabilities)
+
         self._update_disallowed_ngrams()
 
         self.update_state()
@@ -370,7 +392,7 @@ class BeamSearch(FromParams):
 
         # Maintains the length of each prediction, not including the start
         # or end token
-        lengths = start_class_log_probabilities.new_zeros(batch_size * self.beam_size, dtype=torch.long)
+        self.lengths = start_class_log_probabilities.new_zeros(batch_size * self.beam_size, dtype=torch.long)
 
         # If we are applying a coverage penalty, we have to maintain the coverage
         # of each prediction. We initialize it here to be the attention distribution
@@ -385,11 +407,11 @@ class BeamSearch(FromParams):
             last_predictions = self.predictions[-1].reshape(batch_size * self.beam_size)
 
             # If the last token was not the end index, we increment the length by 1
-            lengths += (last_predictions != self._end_index).long()
+            self.lengths += (last_predictions != self._end_index).long()
 
             # If every predicted token from the last step is `self._end_index`,
             # then we can stop early.
-            if (last_predictions == self._end_index).all():
+            if self.is_finished():
                 break
 
             # Take a step. This get the predicted log probs of the next classes
@@ -473,6 +495,8 @@ class BeamSearch(FromParams):
 
             self.predictions.append(restricted_predicted_classes)
 
+            self.log_probs.append(restricted_beam_log_probs)
+
             # shape: (batch_size, beam_size)
             last_log_probabilities = restricted_beam_log_probs
 
@@ -523,9 +547,9 @@ class BeamSearch(FromParams):
                     reshape(batch_size * self.beam_size, *last_dims)
 
         # Update the length one last time if the last token was not the end, then reshape
-        lengths += (self.predictions[-1].reshape(batch_size * self.beam_size) != self._end_index).long()
+        self.lengths += (self.predictions[-1].reshape(batch_size * self.beam_size) != self._end_index).long()
         # shape: (batch_size, beam_size)
-        lengths = lengths.view(batch_size, self.beam_size)
+        self.lengths = self.lengths.view(batch_size, self.beam_size)
 
         if not torch.isfinite(last_log_probabilities).all():
             warnings.warn("Infinite log probabilities encountered. Some final sequences may not make sense. "
@@ -535,10 +559,10 @@ class BeamSearch(FromParams):
                           RuntimeWarning)
 
         # Reconstruct the sequences using the backpointers
-        final_predictions, final_log_probs = self.get_final_predictions(last_log_probabilities)
+        final_predictions, final_log_probs, final_lengths = self.get_final_predictions()
 
         # Use the length penalizer to rerank the predictions if one is provided
-        self._apply_length_penalty(final_predictions, final_log_probs, lengths)
+        self._apply_length_penalty(final_predictions, final_log_probs, final_lengths)
 
         return final_predictions, final_log_probs
 
@@ -548,6 +572,36 @@ class BeamSearch(FromParams):
     def update_state(self) -> None:
         pass
 
-    def get_final_predictions(self, log_probs: torch.Tensor) -> Tuple[List[List[torch.Tensor]], List[torch.Tensor]]:
+    def is_finished(self) -> bool:
+        return (self.predictions[-1] == self._end_index).all()
+
+    def get_final_predictions(self) -> Tuple[List[List[torch.Tensor]], List[torch.Tensor]]:
         predictions = self._reconstruct_predictions(self.predictions, self.backpointers)
-        return predictions, log_probs
+        return predictions, self.log_probs[-1], self.lengths
+
+
+@BeamSearchBase.register('standard')
+class BeamSearch(BeamSearchBase):
+    def __init__(self,
+                 vocab: Vocabulary,
+                 beam_size: int,
+                 namespace: str = 'tokens',
+                 end_symbol: str = None,
+                 min_steps: int = None,
+                 max_steps: int = 50,
+                 per_node_beam_size: int = None,
+                 disallow_repeated_ngrams: int = None,
+                 repeated_ngrams_exceptions: List[List[str]] = None,
+                 length_penalizer: LengthPenalizer = None,
+                 coverage_penalizer: CoveragePenalizer = None) -> None:
+        super().__init__(vocab=vocab,
+                         beam_size=beam_size,
+                         namespace=namespace,
+                         end_symbol=end_symbol,
+                         min_steps=min_steps,
+                         max_steps=max_steps,
+                         per_node_beam_size=per_node_beam_size,
+                         disallow_repeated_ngrams=disallow_repeated_ngrams,
+                         repeated_ngrams_exceptions=repeated_ngrams_exceptions,
+                         length_penalizer=length_penalizer,
+                         coverage_penalizer=coverage_penalizer)
