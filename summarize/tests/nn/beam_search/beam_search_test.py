@@ -10,8 +10,9 @@ from allennlp.common.checks import ConfigurationError
 from allennlp.common.testing import AllenNlpTestCase
 from allennlp.data import Vocabulary
 
-from summarize.nn.beam_search import BeamSearch, StepFunctionType
-from summarize.nn.length_penalizers import WuLengthPenalizer
+from summarize.nn.beam_search import BeamSearch
+from summarize.nn.beam_search.beam_search import StepFunctionType
+from summarize.nn.beam_search.length_penalizers import WuLengthPenalizer
 
 
 transition_probabilities = torch.tensor(  # pylint: disable=not-callable

@@ -1,7 +1,7 @@
 import torch
 from overrides import overrides
 
-from summarize.nn.coverage_penalizers import CoveragePenalizer
+from summarize.nn.beam_search.coverage_penalizers import CoveragePenalizer
 
 
 @CoveragePenalizer.register('onmt')

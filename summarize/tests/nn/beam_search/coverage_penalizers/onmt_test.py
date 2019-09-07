@@ -1,7 +1,7 @@
 import torch
 import unittest
 
-from summarize.nn.coverage_penalizers import ONMTCoveragePenalizer
+from summarize.nn.beam_search.coverage_penalizers import ONMTCoveragePenalizer
 
 
 class TestAverageLengthPenalizer(unittest.TestCase):

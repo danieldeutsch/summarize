@@ -1,2 +1,0 @@
-from summarize.nn.coverage_penalizers.coverage_penalizer import CoveragePenalizer
-from summarize.nn.coverage_penalizers.onmt import ONMTCoveragePenalizer

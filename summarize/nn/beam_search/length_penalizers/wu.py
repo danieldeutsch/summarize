@@ -2,7 +2,7 @@ import numpy as np
 import torch
 from overrides import overrides
 
-from summarize.nn.length_penalizers import LengthPenalizer
+from summarize.nn.beam_search.length_penalizers import LengthPenalizer
 
 
 @LengthPenalizer.register('wu')

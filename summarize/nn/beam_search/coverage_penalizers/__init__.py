@@ -1,0 +1,2 @@
+from summarize.nn.beam_search.coverage_penalizers.coverage_penalizer import CoveragePenalizer
+from summarize.nn.beam_search.coverage_penalizers.onmt import ONMTCoveragePenalizer

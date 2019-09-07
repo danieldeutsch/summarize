@@ -1,7 +1,7 @@
 import torch
 import unittest
 
-from summarize.nn.length_penalizers import AverageLengthPenalizer
+from summarize.nn.beam_search.length_penalizers import AverageLengthPenalizer
 
 
 class TestAverageLengthPenalizer(unittest.TestCase):

@@ -1,4 +1,3 @@
-import copy
 import torch
 import warnings
 from allennlp.common import FromParams
@@ -8,8 +7,8 @@ from allennlp.data import Vocabulary
 from collections import defaultdict
 from typing import Callable, Dict, List, Tuple
 
-from summarize.nn.coverage_penalizers import CoveragePenalizer
-from summarize.nn.length_penalizers import LengthPenalizer
+from summarize.nn.beam_search.coverage_penalizers import CoveragePenalizer
+from summarize.nn.beam_search.length_penalizers import LengthPenalizer
 
 
 StateType = Dict[str, torch.Tensor]  # pylint: disable=invalid-name
