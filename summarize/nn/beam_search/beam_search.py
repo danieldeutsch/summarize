@@ -155,28 +155,24 @@ class BeamSearch(FromParams):
         all_predictions = torch.cat(list(reversed(reconstructed_predictions)), 2)
         return all_predictions
 
-    def _mask_disallowed_ngrams(self,
-                                predictions: List[torch.Tensor],
-                                backpointers: List[torch.Tensor],
-                                class_log_probabilities: torch.Tensor,
-                                disallowed_ngrams: List[List[Dict[Tuple[int, ...], List[int]]]]) -> None:
+    def _mask_disallowed_ngrams(self, class_log_probabilities: torch.Tensor) -> None:
         """
         Performs an in-place modification of the class log-probabilities based on
         not allowing certain ngrams to be repeated.
         """
         if self.disallow_repeated_ngrams is None:
             return
-        if len(predictions) < self.disallow_repeated_ngrams:
+        if len(self.predictions) < self.disallow_repeated_ngrams:
             return
 
-        batch_size = predictions[0].size(0)
+        batch_size = self.predictions[0].size(0)
 
         # If we are disallowing repeated unigrams, there is no prefix to reconstruct.
         # It's ugly, but we handle the case separately
         if self.disallow_repeated_ngrams != 1:
             # shape: (batch_size, beam_size, num_steps)
             reconstructed_ngrams = \
-                self._reconstruct_predictions(predictions, backpointers,
+                self._reconstruct_predictions(self.predictions, self.backpointers,
                                               num_steps=self.disallow_repeated_ngrams - 1)
         for i in range(batch_size):
             for j in range(self.beam_size):
@@ -184,26 +180,23 @@ class BeamSearch(FromParams):
                     prefix = tuple()
                 else:
                     prefix = tuple(reconstructed_ngrams[i, j].tolist())
-                if prefix in disallowed_ngrams[i][j]:
-                    for index in disallowed_ngrams[i][j][prefix]:
+                if prefix in self.disallowed_ngrams[i][j]:
+                    for index in self.disallowed_ngrams[i][j][prefix]:
                         class_log_probabilities[i * self.beam_size + j, index] = float('-inf')
 
-    def _update_disallowed_ngrams(self,
-                                  predictions: List[torch.Tensor],
-                                  backpointers: List[torch.Tensor],
-                                  disallowed_ngrams: List[List[Dict[Tuple[int, ...], List[int]]]]) -> None:
-        batch_size = predictions[0].size(0)
+    def _update_disallowed_ngrams(self) -> None:
+        batch_size = self.predictions[0].size(0)
         updated_disallowed_ngrams = [[defaultdict(list) for _ in range(self.beam_size)] for _ in range(batch_size)]
 
         if self.disallow_repeated_ngrams is None:
             return updated_disallowed_ngrams
-        if len(predictions) < self.disallow_repeated_ngrams:
+        if len(self.predictions) < self.disallow_repeated_ngrams:
             return updated_disallowed_ngrams
 
         # Reconstruct all of the most recent ngrams
         # shape: (batch_size, beam_size, num_steps)
         reconstructed_ngrams = \
-            self._reconstruct_predictions(predictions, backpointers,
+            self._reconstruct_predictions(self.predictions, self.backpointers,
                                           num_steps=self.disallow_repeated_ngrams)
         for i in range(batch_size):
             for j in range(self.beam_size):
@@ -212,9 +205,9 @@ class BeamSearch(FromParams):
                 # than the predictions (because there's no backpointer to the
                 # start token), so if its length is 0, that means there's nothing
                 # to copy
-                if len(backpointers) != 0:
-                    backpointer = backpointers[-1][i][j]
-                    updated_disallowed_ngrams[i][j].update(disallowed_ngrams[i][backpointer])
+                if len(self.backpointers) != 0:
+                    backpointer = self.backpointers[-1][i][j]
+                    updated_disallowed_ngrams[i][j].update(self.disallowed_ngrams[i][backpointer])
 
                 ngram = tuple(reconstructed_ngrams[i, j].tolist())
                 prefix, token = ngram[:-1], ngram[-1]
@@ -223,7 +216,7 @@ class BeamSearch(FromParams):
                 if ngram not in self.repeated_ngrams_exceptions:
                     updated_disallowed_ngrams[i][j][prefix].append(token)
 
-        return updated_disallowed_ngrams
+        self.disallowed_ngrams = updated_disallowed_ngrams
 
     def initialize(self, batch_size: int) -> None:
         # List of (batch_size, beam_size) tensors. One for each time step. Does not
@@ -334,7 +327,7 @@ class BeamSearch(FromParams):
         # shape: [(batch_size, beam_size)]
         self.predictions.append(start_predicted_classes)
 
-        disallowed_ngrams = self._update_disallowed_ngrams(self.predictions, self.backpointers, self.disallowed_ngrams)
+        self._update_disallowed_ngrams()
 
         # Log probability tensor that mandates that the end token is selected.
         # shape: (batch_size * beam_size, num_classes)
@@ -396,7 +389,7 @@ class BeamSearch(FromParams):
 
             # If there are ngrams which are disallowed, we prevent any token
             # which would repeat an ngram from being generated
-            self._mask_disallowed_ngrams(self.predictions, self.backpointers, class_log_probabilities, disallowed_ngrams)
+            self._mask_disallowed_ngrams(class_log_probabilities)
 
             # Here we are finding any beams where we predicted the end token in
             # the previous timestep and replacing the distribution with a
@@ -488,8 +481,7 @@ class BeamSearch(FromParams):
 
             self.backpointers.append(backpointer)
 
-            # Update the disallowed ngrams
-            disallowed_ngrams = self._update_disallowed_ngrams(self.predictions, self.backpointers, disallowed_ngrams)
+            self._update_disallowed_ngrams()
 
             # Keep only the pieces of the state tensors corresponding to the
             # ancestors created this iteration.
