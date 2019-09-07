@@ -235,6 +235,11 @@ class BeamSearch(FromParams):
         # predictions[t-1][i][n], that it came from.
         self.backpointers: List[torch.Tensor] = []
 
+        # Dictionaries which map from the prefix of an ngram (the n-1 tokens
+        # represented as a tuple of indicies) to the list of indices which are not
+        # allowed to appear next. The lists are indexed by batch then beam index.
+        self.disallowed_ngrams = [[defaultdict(list) for _ in range(self.beam_size)] for _ in range(batch_size)]
+
     def search(self,
                start_predictions: torch.Tensor,
                start_state: StateType,
@@ -291,11 +296,6 @@ class BeamSearch(FromParams):
 
         self.initialize(batch_size)
 
-        # Dictionaries which map from the prefix of an ngram (the n-1 tokens
-        # represented as a tuple of indicies) to the list of indices which are not
-        # allowed to appear next. The lists are indexed by batch then beam index.
-        disallowed_ngrams = [[defaultdict(list) for _ in range(self.beam_size)] for _ in range(batch_size)]
-
         # Calculate the first timestep. This is done outside the main loop
         # because we are going from a single decoder input (the output from the
         # encoder) to the top `beam_size` decoder outputs. On the other hand,
@@ -334,7 +334,7 @@ class BeamSearch(FromParams):
         # shape: [(batch_size, beam_size)]
         self.predictions.append(start_predicted_classes)
 
-        disallowed_ngrams = self._update_disallowed_ngrams(self.predictions, self.backpointers, disallowed_ngrams)
+        disallowed_ngrams = self._update_disallowed_ngrams(self.predictions, self.backpointers, self.disallowed_ngrams)
 
         # Log probability tensor that mandates that the end token is selected.
         # shape: (batch_size * beam_size, num_classes)
