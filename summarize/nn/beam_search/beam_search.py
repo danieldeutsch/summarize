@@ -234,10 +234,8 @@ class BeamSearch(FromParams):
                 sorted_indices = torch.argsort(penalized_scores, dim=0, descending=True)
                 # Reorder the probabilities
                 final_log_probs[i] = final_log_probs[i][sorted_indices]
-
                 # Reorder the predictions
-                sorted_indices = sorted_indices.unsqueeze(1).expand_as(final_predictions[i])
-                final_predictions[i] = torch.gather(final_predictions[i], 0, sorted_indices)
+                final_predictions[i] = final_predictions[i][sorted_indices]
 
     def initialize(self, batch_size: int) -> None:
         # List of (batch_size, beam_size) tensors. One for each time step. Does not
@@ -551,5 +549,5 @@ class BeamSearch(FromParams):
         pass
 
     def get_final_predictions(self, log_probs: torch.Tensor) -> Tuple[List[List[torch.Tensor]], List[torch.Tensor]]:
-        final_predictions = self._reconstruct_predictions(self.predictions, self.backpointers)
-        return final_predictions, log_probs
+        predictions = self._reconstruct_predictions(self.predictions, self.backpointers)
+        return predictions, log_probs
