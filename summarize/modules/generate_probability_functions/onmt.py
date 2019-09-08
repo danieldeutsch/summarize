@@ -35,7 +35,7 @@ class ONMTGenerateProbabilityFunction(GenerateProbabilityFunction):
         # later on. Therefore, we move the probability closer to 0.5 by a small
         # number for stability.
         # shape: (batch_size, num_summary_tokens)
-        geq_one_half_mask = (probability >= 0.5).float()
+        # geq_one_half_mask = (probability >= 0.5).float()
         # shape: (batch_size, num_summary_tokens)
-        probability = (probability - 1e-3) * (geq_one_half_mask) + (probability + 1e-3) * (1 - geq_one_half_mask)
+        # probability = (probability - 1e-3) * (geq_one_half_mask) + (probability + 1e-3) * (1 - geq_one_half_mask)
         return probability

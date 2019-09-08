@@ -15,7 +15,7 @@ StateType = Dict[str, torch.Tensor]  # pylint: disable=invalid-name
 StepFunctionType = Callable[[torch.Tensor, StateType], Tuple[torch.Tensor, StateType]]  # pylint: disable=invalid-name
 
 
-class BeamSearchBase(Registrable):
+class BeamSearch(Registrable):
     """
     Implements the beam search algorithm for decoding the most likely sequences.
 
@@ -53,6 +53,8 @@ class BeamSearchBase(Registrable):
         each prediction at each step of decoding. The sequence log-probabilities
         will be augmented by this score only for selecting the next token.
     """
+    default_implementation = 'standard'
+
     def __init__(self,
                  vocab: Vocabulary,
                  beam_size: int,
@@ -566,29 +568,42 @@ class BeamSearchBase(Registrable):
         predictions = self._reconstruct_predictions(self.predictions, self.backpointers)
         return predictions, self.log_probs[-1], self.lengths
 
+    @classmethod
+    def from_params(cls, params: Params, vocab: Vocabulary) -> 'BeamSearch':
+        type_ = params.pop('type', None)
+        if type_ is not None:
+            return cls.by_name(type_).from_params(params=params)
 
-@BeamSearchBase.register('standard')
-class BeamSearch(BeamSearchBase):
-    def __init__(self,
-                 vocab: Vocabulary,
-                 beam_size: int,
-                 namespace: str = 'tokens',
-                 end_symbol: str = None,
-                 min_steps: int = None,
-                 max_steps: int = 50,
-                 per_node_beam_size: int = None,
-                 disallow_repeated_ngrams: int = None,
-                 repeated_ngrams_exceptions: List[List[str]] = None,
-                 length_penalizer: LengthPenalizer = None,
-                 coverage_penalizer: CoveragePenalizer = None) -> None:
-        super().__init__(vocab=vocab,
-                         beam_size=beam_size,
-                         namespace=namespace,
-                         end_symbol=end_symbol,
-                         min_steps=min_steps,
-                         max_steps=max_steps,
-                         per_node_beam_size=per_node_beam_size,
-                         disallow_repeated_ngrams=disallow_repeated_ngrams,
-                         repeated_ngrams_exceptions=repeated_ngrams_exceptions,
-                         length_penalizer=length_penalizer,
-                         coverage_penalizer=coverage_penalizer)
+        beam_size = params.pop('beam_size')
+        namespace = params.pop('namespace', 'tokens')
+        end_symbol = params.pop('end_symbol', None)
+        min_steps = params.pop('min_steps', None)
+        max_steps = params.pop('max_steps', 50)
+        per_node_beam_size = params.pop('per_node_beam_size', None)
+        disallow_repeated_ngrams = params.pop('disallow_repeated_ngrams', None)
+        repeated_ngrams_exceptions = params.pop('repeated_ngrams_exceptions', None)
+
+        length_penalizer = None
+        length_penalizer_params = params.pop('length_penalizer', None)
+        if length_penalizer_params is not None:
+            length_penalizer = LengthPenalizer.from_params(length_penalizer_params)
+
+        coverage_penalizer = None
+        coverage_penalizer_params = params.pop('coverage_penalizer', None)
+        if coverage_penalizer_params is not None:
+            coverage_penalizer = CoveragePenalizer.from_params(coverage_penalizer_params)
+
+        return cls(vocab=vocab,
+                   beam_size=beam_size,
+                   namespace=namespace,
+                   end_symbol=end_symbol,
+                   min_steps=min_steps,
+                   max_steps=max_steps,
+                   per_node_beam_size=per_node_beam_size,
+                   disallow_repeated_ngrams=disallow_repeated_ngrams,
+                   repeated_ngrams_exceptions=repeated_ngrams_exceptions,
+                   length_penalizer=length_penalizer,
+                   coverage_penalizer=coverage_penalizer)
+
+
+BeamSearch.register('standard')(BeamSearch)

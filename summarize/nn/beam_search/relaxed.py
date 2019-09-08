@@ -2,13 +2,13 @@ import torch
 from allennlp.data import Vocabulary
 from typing import List, Tuple
 
-from summarize.nn.beam_search.beam_search import BeamSearchBase
+from summarize.nn.beam_search import BeamSearch
 from summarize.nn.beam_search.coverage_penalizers import CoveragePenalizer
 from summarize.nn.beam_search.length_penalizers import LengthPenalizer
 
 
-@BeamSearchBase.register('relaxed')
-class RelaxedBeamSearch(BeamSearchBase):
+@BeamSearch.register('relaxed')
+class RelaxedBeamSearch(BeamSearch):
     def __init__(self,
                  vocab: Vocabulary,
                  beam_size: int,
