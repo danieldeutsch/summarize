@@ -101,6 +101,7 @@ local hidden_size = 512;
     "loss_normalization": "summary_length",
     "coverage_loss_weight": 0.0,
     "beam_search": {
+      "type": "relaxed",
       "beam_size": 10,
       "min_steps": 35,
       "max_steps": 100,
