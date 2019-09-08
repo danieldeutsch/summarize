@@ -53,8 +53,6 @@ class BeamSearchBase(Registrable):
         each prediction at each step of decoding. The sequence log-probabilities
         will be augmented by this score only for selecting the next token.
     """
-    default_implementation = 'standard'
-
     def __init__(self,
                  vocab: Vocabulary,
                  beam_size: int,
@@ -227,17 +225,10 @@ class BeamSearchBase(Registrable):
         if self.length_penalizer is not None:
             batch_size = len(final_predictions)
             for i in range(batch_size):
-                print()
-                print(final_predictions[i])
-                print(final_log_probs[i])
-                print(lengths[i])
-
                 # shape: (beam_size)
                 length_penalties = self.length_penalizer(lengths[i])
                 # shape: (beam_size)
                 penalized_scores = final_log_probs[i] / length_penalties
-                print('penalized')
-                print(penalized_scores)
                 # Sort the new scores in descending order
                 # shape: (beam_size)
                 sorted_indices = torch.argsort(penalized_scores, dim=0, descending=True)
@@ -248,10 +239,6 @@ class BeamSearchBase(Registrable):
                     final_predictions[i] = final_predictions[i][sorted_indices]
                 else:
                     final_predictions[i] = [final_predictions[i][index.item()] for index in sorted_indices]
-
-                print(final_predictions[i])
-                print(final_predictions[i])
-                print(final_log_probs[i])
 
     def initialize(self, batch_size: int) -> None:
         # List of (batch_size, beam_size) tensors. One for each time step. Does not

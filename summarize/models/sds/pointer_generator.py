@@ -15,7 +15,7 @@ from summarize.modules.bridge import Bridge
 from summarize.modules.coverage_matrix_attention import CoverageMatrixAttention
 from summarize.modules.generate_probability_functions import GenerateProbabilityFunction
 from summarize.modules.rnns import RNN
-from summarize.nn.beam_search import BeamSearch
+from summarize.nn.beam_search.beam_search import BeamSearchBase
 
 
 @Model.register('sds-pointer-generator')
@@ -89,8 +89,8 @@ class PointerGeneratorModel(Model):
                  decoder: RNN,
                  bridge: Bridge,
                  generate_probability_function: GenerateProbabilityFunction,
-                 beam_search: BeamSearch,
-                 validation_beam_search: Optional[BeamSearch] = None,
+                 beam_search: BeamSearchBase,
+                 validation_beam_search: Optional[BeamSearchBase] = None,
                  summary_token_embedder: Optional[TokenEmbedder] = None,
                  summary_namespace: str = 'tokens',
                  use_input_feeding: bool = False,
@@ -131,8 +131,6 @@ class PointerGeneratorModel(Model):
         self.end_index = token_to_index[END_SYMBOL]
         assert DEFAULT_PADDING_TOKEN in token_to_index
         self.pad_index = token_to_index[DEFAULT_PADDING_TOKEN]
-        assert COPY_SYMBOL in token_to_index
-        self.copy_index = token_to_index[COPY_SYMBOL]
         assert DEFAULT_OOV_TOKEN in token_to_index
         self.oov_index = token_to_index[DEFAULT_OOV_TOKEN]
         self.sent_start_index = None
@@ -152,6 +150,8 @@ class PointerGeneratorModel(Model):
         self.cross_entropy_metric = Average()
 
         initializer(self)
+
+        self.first = True
 
     def _run_encoder(self, document: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, ...]:
         """
@@ -275,7 +275,7 @@ class PointerGeneratorModel(Model):
         # target tokens because we don't want to teach the generative model to
         # output the copy token.
         # shape: (batch_size, num_summary_tokens - 1)
-        summary_input_tokens = self._replace_oov_with_copy(summary_input_tokens, summary_token_document_indices_mask)
+        # summary_input_tokens = self._replace_oov_with_copy(summary_input_tokens, summary_token_document_indices_mask)
 
         # Pass the input tokens through the decoding step
         # shape: (batch_size, num_summary_tokens - 1, summary_vocab_size)
@@ -301,9 +301,9 @@ class PointerGeneratorModel(Model):
                                                       summary_token_document_indices_mask)
 
         # shape: (batch_size, num_summary_tokens - 1)
-        log_p_gen = torch.log(p_gen)
+        log_p_gen = torch.log(1.0 - p_gen)
         # shape: (batch_size, num_summary_tokens - 1)
-        log_p_copy = torch.log(1.0 - p_gen)
+        log_p_copy = torch.log(p_gen)
         # shape: (batch_size, num_summary_tokens - 1)
         combined_log_probs = torch.stack([log_p_gen + vocab_log_probs,
                                           log_p_copy + copy_log_probs], dim=2)
@@ -374,7 +374,7 @@ class PointerGeneratorModel(Model):
         # shape: (batch_size, num_summary_tokens)
         mask = (is_oov & can_copy).long()
         # shape: (batch_size, num_summary_tokens)
-        tokens = (1 - mask) * tokens + mask * self.copy_index
+        tokens = (1 - mask) * tokens + mask * self.oov_index
         return tokens
 
     def _compute_vocab_log_probs(self,
@@ -689,7 +689,7 @@ class PointerGeneratorModel(Model):
         """
         vocab_size = self.vocab.get_vocab_size(self.summary_namespace)
         copy_mask = (tokens >= vocab_size).long()
-        return (1 - copy_mask) * tokens + copy_mask * self.copy_index
+        return (1 - copy_mask) * tokens + copy_mask * self.oov_index
 
     def _apply_input_feeding(self,
                              embedding: torch.Tensor,
@@ -820,9 +820,9 @@ class PointerGeneratorModel(Model):
         num_document_tokens = attention_probabilities.size(1)
 
         # shape: (batch_size)
-        log_p_gen = torch.log(p_gen)
+        log_p_gen = torch.log(1.0 - p_gen)
         # shape: (batch_size)
-        log_p_copy = torch.log(1.0 - p_gen)
+        log_p_copy = torch.log(p_gen)
 
         # Copy the logits into an expanded tensor with epsilon scores for
         # the document tokens so there aren't numerical issues
@@ -868,7 +868,7 @@ class PointerGeneratorModel(Model):
 
     def _run_inference(self,
                        initial_decoding_state: Dict[str, torch.Tensor],
-                       beam_search: BeamSearch) -> Tuple[torch.Tensor, torch.Tensor]:
+                       beam_search: BeamSearchBase) -> Tuple[torch.Tensor, torch.Tensor]:
         """
         Runs inference given the initial decoder state. Beam search is
         implemented using AllenNLP's generic beam search logic.
@@ -922,13 +922,12 @@ class PointerGeneratorModel(Model):
             The tokens joined into summaries
         """
         vocab_size = self.vocab.get_vocab_size(self.summary_namespace)
-        batch_size, num_tokens = indices.size()
         summaries = []
-        for batch in range(batch_size):
+        for batch in range(len(indices)):
             tokens = []
-            for i in range(num_tokens):
+            for i in range(len(indices[batch])):
                 # The best prediction is in the 0th beam position
-                index = indices[batch, i].item()
+                index = indices[batch][i].item()
                 # We skip the start, sentence start, and sentence end indices. It is ok
                 # if these are ``None`` because the index should never be ``None``
                 if index in [self.start_index, self.sent_start_index, self.sent_end_index]:
@@ -965,11 +964,11 @@ class PointerGeneratorModel(Model):
         """
         # If we have acess to the ground-truth summaries, then we can
         # compute metrics
-        batch_size = predictions.size(0)
+        batch_size = len(predictions)
         if summary_field_name in metadata[0] and self.metrics is not None:
             gold_summaries = [metadata[batch][summary_field_name] for batch in range(batch_size)]
             # shape: (batch_size, max_output_length)
-            model_summaries = predictions[:, 0, :]
+            model_summaries = [prediction[0] for prediction in predictions]
             document_tokens = [metadata[batch]['document_tokens'] for batch in range(batch_size)]
             model_summaries = self._convert_indices_to_string(model_summaries, document_tokens)
             for metric in self.metrics:
@@ -1008,6 +1007,29 @@ class PointerGeneratorModel(Model):
             The mask for ``summary_token_document_indices`` which indicates which
             values are valid.
         """
+        if self.first:
+            oov = self.document_token_embedder._token_embedders['tokens'].weight[0].clone()
+            pad = self.document_token_embedder._token_embedders['tokens'].weight[1].clone()
+            self.document_token_embedder._token_embedders['tokens'].weight[1].copy_(oov)
+            self.document_token_embedder._token_embedders['tokens'].weight[0].copy_(pad)
+
+            oov = self.summary_token_embedder.weight[0].clone()
+            pad = self.summary_token_embedder.weight[1].clone()
+            self.summary_token_embedder.weight[1].copy_(oov)
+            self.summary_token_embedder.weight[0].copy_(pad)
+
+            oov = self.output_layer.weight[0].clone()
+            pad = self.output_layer.weight[1].clone()
+            self.output_layer.weight[1].copy_(oov)
+            self.output_layer.weight[0].copy_(pad)
+
+            oov = self.output_layer.bias[0].clone()
+            pad = self.output_layer.bias[1].clone()
+            self.output_layer.bias[1].copy_(oov)
+            self.output_layer.bias[0].copy_(pad)
+
+            self.first = False
+
         # shape: (batch_size, num_document_tokens, encoder_hidden_size)
         # shape: (batch_size, num_document_tokens)
         # shape: (batch_size, decoder_hidden_size)
@@ -1077,9 +1099,9 @@ class PointerGeneratorModel(Model):
                summary_field_name: str = 'summary') -> Dict[str, Any]:
         predictions = output_dict.pop('predictions')
         metadata = output_dict.pop('metadata')
-        batch_size, beam_size, max_output_length = predictions.size()
+        batch_size = len(predictions)
 
-        top_predictions = predictions[:, 0, :]
+        top_predictions = [prediction[0] for prediction in predictions]
         document_tokens = [metadata[batch]['document_tokens'] for batch in range(batch_size)]
         summaries = self._convert_indices_to_string(top_predictions, document_tokens)
 
