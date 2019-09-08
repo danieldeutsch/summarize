@@ -79,6 +79,7 @@ class RelaxedBeamSearch(BeamSearch):
             final_predictions.append([predictions[j.item()] for j in sorted_indices])
             final_log_probs.append(log_probs[sorted_indices])
             # - 1 because we aren't counting the end token
-            final_lengths.append(torch.LongTensor([len(predictions[j.item()]) - 1 for j in sorted_indices]))
+            lengths = log_probs.new_tensor([len(predictions[j.item()]) - 1 for j in sorted_indices], dtype=torch.float)
+            final_lengths.append(lengths)
 
         return final_predictions, final_log_probs, final_lengths
