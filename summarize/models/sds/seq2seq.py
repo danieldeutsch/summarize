@@ -577,11 +577,11 @@ class Seq2SeqModel(Model):
         """
         # If we have acess to the ground-truth summaries, then we can
         # compute metrics
-        batch_size = predictions.size(0)
+        batch_size = len(predictions)
         if summary_field_name in metadata[0] and self.metrics is not None:
             gold_summaries = [metadata[batch][summary_field_name] for batch in range(batch_size)]
             # shape: (batch_size, max_output_length)
-            model_summaries = predictions[:, 0, :]
+            model_summaries = [prediction[0] for prediction in predictions]
             for metric in self.metrics:
                 metric(gold_summaries=gold_summaries, model_summaries=model_summaries)
 
@@ -654,14 +654,15 @@ class Seq2SeqModel(Model):
                output_dict: Dict[str, torch.Tensor],
                summary_field_name: str = 'summary') -> Dict[str, Any]:
         predictions = output_dict.pop('predictions')
-        batch_size, beam_size, max_output_length = predictions.size()
+        batch_size = len(predictions)
 
         summaries = []
         for batch in range(batch_size):
             tokens = []
-            for i in range(max_output_length):
+            prediction = predictions[batch][0]
+            for i in range(len(prediction)):
                 # The best prediction is in the 0th beam position
-                index = predictions[batch, 0, i].item()
+                index = prediction[i].item()
                 # We skip the start, sentence start, and sentence end indices. It is ok
                 # if these are ``None`` because the index should never be ``None``
                 if index in [self.start_index, self.sent_start_index, self.sent_end_index]:

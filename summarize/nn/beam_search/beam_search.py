@@ -572,7 +572,7 @@ class BeamSearch(Registrable):
     def from_params(cls, params: Params, vocab: Vocabulary) -> 'BeamSearch':
         type_ = params.pop('type', None)
         if type_ is not None:
-            return cls.by_name(type_).from_params(params=params)
+            return cls.by_name(type_).from_params(params=params, vocab=vocab)
 
         beam_size = params.pop('beam_size')
         namespace = params.pop('namespace', 'tokens')
