@@ -9,6 +9,13 @@ from summarize.nn.beam_search.length_penalizers import LengthPenalizer
 
 @BeamSearch.register('relaxed')
 class RelaxedBeamSearch(BeamSearch):
+    """
+    RelaxedBeamSearch is an implementation of beam search that allows reusing
+    beam entries after a completed sequence has been found and continues to search
+    until either the top entry in the beam is a complete sequence or the maximum
+    number of steps is reached. This implementation was done to match the beam
+    search results of OpenNMT.
+    """
     def __init__(self,
                  vocab: Vocabulary,
                  beam_size: int,
