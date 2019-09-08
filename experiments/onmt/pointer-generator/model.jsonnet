@@ -4,7 +4,7 @@ local hidden_size = 512;
 {
   "dataset_reader": {
     "type": "sds-pointer-generator",
-    "lazy": false,
+    "lazy": true,
     "document_tokenizer": {
       "type": "word",
       "word_splitter": {
@@ -130,7 +130,8 @@ local hidden_size = 512;
     "type": "bucket",
     "batch_size": 16,
     "sorting_keys": [["document", "num_tokens"]],
-    "instances_per_epoch": 160000
+    "instances_per_epoch": 160000,
+    "max_instances_in_memory": 160000
   },
   "validation_iterator": {
     "type": "bucket",
