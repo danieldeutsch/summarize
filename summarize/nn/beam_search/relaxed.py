@@ -69,7 +69,21 @@ class RelaxedBeamSearch(BeamSearch):
     def is_finished(self) -> bool:
         return self._is_finished.all()
 
+    def _add_unfinished_states(self) -> None:
+        """
+        If there is a batch that does not have any finished sequences, this
+        method will add the highest-probability sequence to the completed sequences
+        so the `get_final_predictions` method does not fail.
+        """
+        for batch, (predictions, log_probs) in enumerate(zip(self._complete_predictions, self._complete_log_probs)):
+            if len(predictions) == 0:
+                prediction = self._reconstruct_single_prediction(batch, 0)
+                self._complete_predictions[batch].append(prediction)
+                self._complete_log_probs[batch].append(self.log_probs[-1][batch, 0])
+
     def get_final_predictions(self) -> Tuple[List[List[torch.Tensor]], List[torch.Tensor]]:
+        self._add_unfinished_states()
+
         final_predictions = []
         final_log_probs = []
         final_lengths = []
@@ -78,8 +92,14 @@ class RelaxedBeamSearch(BeamSearch):
             sorted_indices = torch.argsort(log_probs, descending=True)
             final_predictions.append([predictions[j.item()] for j in sorted_indices])
             final_log_probs.append(log_probs[sorted_indices])
-            # - 1 because we aren't counting the end token
-            lengths = log_probs.new_tensor([len(predictions[j.item()]) - 1 for j in sorted_indices], dtype=torch.float)
+
+            lengths = []
+            for j in sorted_indices:
+                length = len(predictions[j.item()])
+                if predictions[j.item()][-1] == self._end_index:
+                    length -= 1
+                lengths.append(length)
+            lengths = log_probs.new_tensor(lengths, dtype=torch.float)
             final_lengths.append(lengths)
 
         return final_predictions, final_log_probs, final_lengths
