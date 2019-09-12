@@ -93,6 +93,7 @@ local hidden_size = 512;
     "use_input_feeding": true,
     "loss_normalization": "summaries",
     "beam_search": {
+      "type": "relaxed",
       "beam_size": 10,
       "min_steps": 35,
       "max_steps": 100,
