@@ -9,6 +9,7 @@ import hashlib
 import os
 import tarfile
 from io import BytesIO
+from nltk.tokenize import sent_tokenize
 from tqdm import tqdm
 from typing import Any, Dict, List, Tuple
 
@@ -57,6 +58,10 @@ def parse_story(story_bytes: bytes) -> Tuple[List[str], List[str]]:
             highlights.append(line)
         else:
             article.append(line)
+
+    # The lines do not perfectly align with sentence boundaries, so try to fix that
+    article = [sentence for line in article for sentence in sent_tokenize(line)]
+    highlights = [sentence for line in highlights for sentence in sent_tokenize(line)]
     return article, highlights
 
 
