@@ -39,7 +39,6 @@ class ClozePointerGeneratorModel(PointerGeneratorModel):
                  generate_probability_function: GenerateProbabilityFunction,
                  beam_search: BeamSearch,
                  use_context: bool,
-                 validation_beam_search: Optional[BeamSearch] = None,
                  cloze_token_embedder: Optional[TokenEmbedder] = None,
                  cloze_namespace: str = 'tokens',
                  use_input_feeding: bool = False,
@@ -59,7 +58,6 @@ class ClozePointerGeneratorModel(PointerGeneratorModel):
                          bridge=bridge,
                          generate_probability_function=generate_probability_function,
                          beam_search=beam_search,
-                         validation_beam_search=validation_beam_search,
                          summary_token_embedder=cloze_token_embedder,
                          summary_namespace=cloze_namespace,
                          use_input_feeding=use_input_feeding,
@@ -224,10 +222,9 @@ class ClozePointerGeneratorModel(PointerGeneratorModel):
 
         # If we aren't training, then we need to do inference
         if not self.training:
-            beam_search = self.beam_search if cloze is None else self.validation_beam_search
             # shape: (batch_size, beam_size, max_output_length)
             # shape: (batch_size, beam_size)
-            predictions, log_probabilities = self._run_inference(initial_decoding_state, beam_search)
+            predictions, log_probabilities = self._run_inference(initial_decoding_state)
             output_dict['predictions'] = predictions
             output_dict['log_probabilities'] = log_probabilities
             self._update_metrics(predictions, metadata, summary_field_name='cloze')
