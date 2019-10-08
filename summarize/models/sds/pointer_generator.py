@@ -17,6 +17,7 @@ from summarize.modules.generate_probability_functions import GenerateProbability
 from summarize.modules.rnns import RNN
 from summarize.nn.beam_search import BeamSearch
 from summarize.nn.util import normalize_losses
+from summarize.training.metrics import CrossEntropyMetric
 
 
 @Model.register('sds-pointer-generator')
@@ -147,12 +148,7 @@ class PointerGeneratorModel(Model):
 
         # Define the metrics that will be computed
         self.metrics = metrics
-        # For the token-level cross-entropy, we use an average.
-        # This is technically not the exact cross-entropy because
-        # it's first averaged by the number of tokens in the batch and then the
-        # number of batches instead of the total number tokens. In practice, I don't
-        # think it will matter much.
-        self.cross_entropy_metric = Average()
+        self.cross_entropy_metric = CrossEntropyMetric()
 
         initializer(self)
 
@@ -328,10 +324,11 @@ class PointerGeneratorModel(Model):
                                 self.batch_loss_normalization)
 
         # Compute the token-level cross-entropy
+        total_loss = (nll_losses * losses_mask).sum()
         num_targets = losses_mask.sum()
-        cross_entropy = (nll_losses * losses_mask).sum() / num_targets
+        self.cross_entropy_metric(total_loss.item(), num_targets.item())
 
-        return loss, cross_entropy
+        return loss
 
     def _replace_oov_with_copy(self,
                                tokens: torch.Tensor,
@@ -1039,11 +1036,9 @@ class PointerGeneratorModel(Model):
         if summary is not None:
             summary_token_document_indices = summary_token_document_indices.long()
 
-            loss, cross_entropy = self._compute_loss(initial_decoding_state, summary,
+            output_dict['loss'] = self._compute_loss(initial_decoding_state, summary,
                                                      summary_token_document_indices,
                                                      summary_token_document_indices_mask)
-            output_dict['loss'] = loss
-            self.cross_entropy_metric(cross_entropy.item())
 
         # If we aren't training, then we need to do inference
         if not self.training:
@@ -1079,5 +1074,5 @@ class PointerGeneratorModel(Model):
         metrics = {}
         for metric in self.metrics:
             metrics.update(metric.get_metric(reset))
-        metrics['cross-entropy'] = self.cross_entropy_metric.get_metric(reset)
+        metrics.update(self.cross_entropy_metric.get_metric(reset))
         return metrics

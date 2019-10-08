@@ -218,11 +218,9 @@ class ClozePointerGeneratorModel(PointerGeneratorModel):
         if cloze is not None:
             cloze_token_document_indices = cloze_token_document_indices.long()
 
-            loss, cross_entropy = self._compute_loss(initial_decoding_state, cloze,
+            output_dict['loss'] = self._compute_loss(initial_decoding_state, cloze,
                                                      cloze_token_document_indices,
                                                      cloze_token_document_indices_mask)
-            output_dict['loss'] = loss
-            self.cross_entropy_metric(cross_entropy.item())
 
         # If we aren't training, then we need to do inference
         if not self.training:
