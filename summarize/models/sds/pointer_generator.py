@@ -6,7 +6,7 @@ from allennlp.models import Model
 from allennlp.modules import FeedForward, TextFieldEmbedder, TokenEmbedder
 from allennlp.nn import InitializerApplicator, RegularizerApplicator
 from allennlp.nn.util import get_text_field_mask, weighted_sum
-from allennlp.training.metrics import Average, Metric
+from allennlp.training.metrics import Metric
 from overrides import overrides
 from typing import Any, Dict, List, Optional, Tuple, Union
 
