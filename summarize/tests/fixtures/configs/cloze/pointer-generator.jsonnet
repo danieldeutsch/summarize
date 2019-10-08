@@ -122,7 +122,8 @@ local cloze_namespace = "cloze_tokens";
         "namespace": cloze_namespace
       }
     ],
-    "loss_normalization": "summary_length",
+    "instance_loss_normalization": "sum",
+    "batch_loss_normalization": "average",
     "coverage_loss_weight": 1.0
   },
   "iterator": {

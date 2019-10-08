@@ -119,7 +119,8 @@ local summary_namespace = "summary_tokens";
         "namespace": summary_namespace
       }
     ],
-    "loss_normalization": "summary_length",
+    "instance_loss_normalization": "sum",
+    "batch_loss_normalization": "average",
     "coverage_loss_weight": 1.0
   },
   "iterator": {

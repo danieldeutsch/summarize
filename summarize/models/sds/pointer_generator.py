@@ -16,6 +16,7 @@ from summarize.modules.coverage_matrix_attention import CoverageMatrixAttention
 from summarize.modules.generate_probability_functions import GenerateProbabilityFunction
 from summarize.modules.rnns import RNN
 from summarize.nn.beam_search import BeamSearch
+from summarize.nn.util import normalize_losses
 
 
 @Model.register('sds-pointer-generator')
@@ -72,11 +73,12 @@ class PointerGeneratorModel(Model):
         run on the concatenated input embedding and context vector. The output will
         be passed as input to the decoder. This is not specified in Luong et al. (2015),
         but it is used in See et al. (2017).
-    loss_normalization: ``str``, optional (default = ``summaries``)
-        Controls how the loss is normalized. The choices are "summaries"
-        (normalizes by the number of summaries), "tokens" (by the
-        total number of tokens in the batch), or "summary_length" (sum over summaries
-        of the average loss per token).
+    instance_loss_normalization: ``str``
+        The method for normalizing the loss per-instance. See `summarize.nn.util.normalize_losses`
+        for more information.
+    batch_loss_normalization: ``str``
+        The method for normalizing the loss for the batch. See `summarize.nn.util.normalize_losses`
+        for more information.
     coverage_loss_weight: ``float``, optional (default = ``1.0``)
         The weight to place on the coverage loss (lambda in See et al. (2017))
     """
@@ -95,7 +97,8 @@ class PointerGeneratorModel(Model):
                  summary_namespace: str = 'tokens',
                  use_input_feeding: bool = False,
                  input_feeding_projection_layer: Optional[FeedForward] = None,
-                 loss_normalization: str = 'summaries',
+                 instance_loss_normalization: str = 'sum',
+                 batch_loss_normalization: str = 'average',
                  metrics: Optional[List[Metric]] = None,
                  coverage_loss_weight: float = 1.0,
                  initializer: InitializerApplicator = InitializerApplicator(),
@@ -114,8 +117,8 @@ class PointerGeneratorModel(Model):
         self.summary_namespace = summary_namespace
         self.use_input_feeding = use_input_feeding
         self.input_feeding_projection_layer = input_feeding_projection_layer
-
-        self.loss_normalization = loss_normalization
+        self.instance_loss_normalization = instance_loss_normalization
+        self.batch_loss_normalization = batch_loss_normalization
         self.coverage_loss_weight = coverage_loss_weight
         # The ``output_layer`` is applied after the attention context and decoder
         # hidden state are combined. It is used to calculate the softmax over the
@@ -319,29 +322,15 @@ class PointerGeneratorModel(Model):
         else:
             losses = nll_losses
 
-        # Apply loss masking based on pads
-        # shape: (batch_size, num_summary_tokens - 1)
-        loss_mask = (summary_target_tokens != self.pad_index).float()
-        # shape: (batch_size, num_summary_tokens - 1)
-        losses = losses * loss_mask
-        # shape: (batch_size, num_summary_tokens - 1)
-        nll_losses = nll_losses * loss_mask
+        losses_mask = (summary_target_tokens != self.pad_index).float()
+        loss = normalize_losses(losses, losses_mask,
+                                self.instance_loss_normalization,
+                                self.batch_loss_normalization)
 
         # Compute the token-level cross-entropy
-        num_targets = loss_mask.sum()
-        cross_entropy = nll_losses.sum() / num_targets
+        num_targets = losses_mask.sum()
+        cross_entropy = (nll_losses * losses_mask).sum() / num_targets
 
-        if self.loss_normalization == 'summaries':
-            loss = losses.sum() / batch_size
-        elif self.loss_normalization == 'summary_length':
-            # shape: (batch_size)
-            loss_per_summary = losses.sum(dim=1)
-            # shape: (batch_size)
-            summary_length = loss_mask.sum(dim=1)
-            # shape: (1)
-            loss = (loss_per_summary / summary_length).sum()
-        elif self.loss_normalization == 'tokens':
-            loss = losses.sum() / num_targets
         return loss, cross_entropy
 
     def _replace_oov_with_copy(self,
