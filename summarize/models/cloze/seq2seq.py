@@ -127,9 +127,7 @@ class ClozeSeq2SeqModel(Seq2SeqModel):
             # shape: (batch_size, num_summary_tokens - 1, summary_vocab_size)
             # shape: (batch_size, num_summary_tokens - 1, summary_vocab_size)
             logits, targets = self._run_teacher_forcing(initial_decoding_state, cloze)
-            loss, cross_entropy = self._compute_loss(logits, targets)
-            output_dict['loss'] = loss
-            self.cross_entropy_metric(cross_entropy.item())
+            output_dict['loss'] = self._compute_loss(logits, targets)
 
         # If we aren't training, then we need to do inference
         if not self.training:

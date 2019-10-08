@@ -5,7 +5,7 @@ from allennlp.models import Model
 from allennlp.modules import FeedForward, MatrixAttention, TextFieldEmbedder, TokenEmbedder
 from allennlp.nn import InitializerApplicator, RegularizerApplicator
 from allennlp.nn.util import get_text_field_mask, masked_softmax, weighted_sum
-from allennlp.training.metrics import Average, Metric
+from allennlp.training.metrics import Metric
 from overrides import overrides
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -14,6 +14,7 @@ from summarize.modules.bridge import Bridge
 from summarize.modules.rnns import RNN
 from summarize.nn.beam_search import BeamSearch
 from summarize.nn.util import normalize_losses
+from summarize.training.metrics import CrossEntropyMetric
 
 
 @Model.register('sds-seq2seq')
@@ -123,12 +124,7 @@ class Seq2SeqModel(Model):
 
         # Define the metrics that will be computed
         self.metrics = metrics
-        # For the token-level cross-entropy, we use an average.
-        # This is technically not the exact cross-entropy because
-        # it's first averaged by the number of tokens in the batch and then the
-        # number of batches instead of the total number tokens. In practice, I don't
-        # think it will matter much.
-        self.cross_entropy_metric = Average()
+        self.cross_entropy_metric = CrossEntropyMetric()
 
         initializer(self)
 
@@ -534,10 +530,11 @@ class Seq2SeqModel(Model):
                                 self.batch_loss_normalization)
 
         # Compute the token-level cross-entropy
-        num_targets = losses_mask.long().sum()
-        cross_entropy = (losses * losses_mask).sum() / num_targets
+        total_loss = (losses * losses_mask).sum()
+        num_targets = losses_mask.sum()
+        self.cross_entropy_metric(total_loss.item(), num_targets.item())
 
-        return loss, cross_entropy
+        return loss
 
     def _run_inference(self, initial_decoding_state: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
         """
@@ -643,9 +640,7 @@ class Seq2SeqModel(Model):
             # shape: (batch_size, num_summary_tokens - 1, summary_vocab_size)
             # shape: (batch_size, num_summary_tokens - 1, summary_vocab_size)
             logits, targets = self._run_teacher_forcing(initial_decoding_state, summary)
-            loss, cross_entropy = self._compute_loss(logits, targets)
-            output_dict['loss'] = loss
-            self.cross_entropy_metric(cross_entropy.item())
+            output_dict['loss'] = self._compute_loss(logits, targets)
 
         # If we aren't training, then we need to do inference
         if not self.training:
@@ -694,5 +689,5 @@ class Seq2SeqModel(Model):
         metrics = {}
         for metric in self.metrics:
             metrics.update(metric.get_metric(reset))
-        metrics['cross-entropy'] = self.cross_entropy_metric.get_metric(reset)
+        metrics.update(self.cross_entropy_metric.get_metric(reset))
         return metrics
