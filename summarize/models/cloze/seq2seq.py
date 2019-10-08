@@ -36,6 +36,7 @@ class ClozeSeq2SeqModel(Seq2SeqModel):
                  bridge: Bridge,
                  beam_search: BeamSearch,
                  use_context: bool,
+                 run_beam_search: bool = True,
                  cloze_token_embedder: Optional[TokenEmbedder] = None,
                  cloze_namespace: str = 'tokens',
                  use_input_feeding: bool = False,
@@ -53,6 +54,7 @@ class ClozeSeq2SeqModel(Seq2SeqModel):
                          decoder=decoder,
                          bridge=bridge,
                          beam_search=beam_search,
+                         run_beam_search=run_beam_search,
                          summary_token_embedder=cloze_token_embedder,
                          summary_namespace=cloze_namespace,
                          use_input_feeding=use_input_feeding,
@@ -130,7 +132,7 @@ class ClozeSeq2SeqModel(Seq2SeqModel):
             output_dict['loss'] = self._compute_loss(logits, targets)
 
         # If we aren't training, then we need to do inference
-        if not self.training:
+        if not self.training and self.run_beam_search:
             # shape: (batch_size, beam_size, max_output_length)
             # shape: (batch_size, beam_size)
             predictions, log_probabilities = self._run_inference(initial_decoding_state)

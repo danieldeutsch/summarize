@@ -46,6 +46,10 @@ class Seq2SeqModel(Model):
         initial decoder hidden state. If ``None``, no layer will be used.
     beam_search: ``BeamSearch``
         The ``BeamSearch`` object to use for prediction and validation.
+    run_beam_search: ``bool``
+        Indicates whether or not beam search should be run during prediction. This
+        is useful to turn off during training and on during testing if the
+        beam search procedure is expensive.
     summary_token_embedder: ``TokenEmbedder``, optional (default = ``None``)
         The ``TokenEmbedder`` that will embed the summary tokens. If ``None``, the
         ``document_token_embedder``'s embedder for the ``"tokens"`` will be used.
@@ -76,6 +80,7 @@ class Seq2SeqModel(Model):
                  decoder: RNN,
                  bridge: Bridge,
                  beam_search: BeamSearch,
+                 run_beam_search: bool = True,
                  summary_token_embedder: Optional[TokenEmbedder] = None,
                  summary_namespace: str = 'tokens',
                  use_input_feeding: bool = False,
@@ -93,6 +98,7 @@ class Seq2SeqModel(Model):
         self.decoder = decoder
         self.bridge = bridge
         self.beam_search = beam_search
+        self.run_beam_search = run_beam_search
         self.summary_token_embedder = summary_token_embedder or document_token_embedder._token_embedders['tokens']
         self.summary_namespace = summary_namespace
         self.use_input_feeding = use_input_feeding
@@ -643,7 +649,7 @@ class Seq2SeqModel(Model):
             output_dict['loss'] = self._compute_loss(logits, targets)
 
         # If we aren't training, then we need to do inference
-        if not self.training:
+        if not self.training and self.run_beam_search:
             # shape: (batch_size, beam_size, max_output_length)
             # shape: (batch_size, beam_size)
             predictions, log_probabilities = self._run_inference(initial_decoding_state)
