@@ -13,6 +13,7 @@ from summarize.common.util import SENT_START_SYMBOL, SENT_END_SYMBOL
 from summarize.modules.bridge import Bridge
 from summarize.modules.rnns import RNN
 from summarize.nn.beam_search import BeamSearch
+from summarize.nn.util import normalize_losses
 
 
 @Model.register('sds-seq2seq')
@@ -58,10 +59,12 @@ class Seq2SeqModel(Model):
         run on the concatenated input embedding and context vector. The output will
         be passed as input to the decoder. This is not specified in Luong et al. (2015),
         but it is used in See et al. (2017).
-    loss_normalization: ``str``, optional (default = ``summaries``)
-        Controls how the cross-entropy loss is normalized. The choices are
-        "summaries", which normalized by the number of summaries (the batch size)
-        or "tokens", by the total number of tokens in the batch.
+    instance_loss_normalization: ``str``
+        The method for normalizing the loss per-instance. See `summarize.nn.util.normalize_losses`
+        for more information.
+    batch_loss_normalization: ``str``
+        The method for normalizing the loss for the batch. See `summarize.nn.util.normalize_losses`
+        for more information.
     """
     def __init__(self,
                  vocab: Vocabulary,
@@ -76,7 +79,8 @@ class Seq2SeqModel(Model):
                  summary_namespace: str = 'tokens',
                  use_input_feeding: bool = False,
                  input_feeding_projection_layer: Optional[FeedForward] = None,
-                 loss_normalization: str = 'summaries',
+                 instance_loss_normalization: str = 'sum',
+                 batch_loss_normalization: str = 'average',
                  metrics: Optional[List[Metric]] = None,
                  initializer: InitializerApplicator = InitializerApplicator(),
                  regularizer: RegularizerApplicator = None) -> None:
@@ -92,7 +96,8 @@ class Seq2SeqModel(Model):
         self.summary_namespace = summary_namespace
         self.use_input_feeding = use_input_feeding
         self.input_feeding_projection_layer = input_feeding_projection_layer
-        self.loss_normalization = loss_normalization
+        self.instance_loss_normalization = instance_loss_normalization
+        self.batch_loss_normalization = batch_loss_normalization
         # The ``output_layer`` is applied after the attention context and decoder
         # hidden state are combined. It is used to calculate the softmax over the
         # summary vocabulary
@@ -114,7 +119,7 @@ class Seq2SeqModel(Model):
         if SENT_END_SYMBOL in token_to_index:
             self.sent_end_index = token_to_index[SENT_END_SYMBOL]
 
-        self.loss = torch.nn.CrossEntropyLoss(ignore_index=self.pad_index, reduction='sum')
+        self.loss = torch.nn.CrossEntropyLoss(ignore_index=self.pad_index, reduction='none')
 
         # Define the metrics that will be computed
         self.metrics = metrics
@@ -516,16 +521,22 @@ class Seq2SeqModel(Model):
         targets = targets.view(-1)
         # shape: (batch_size * num_target_tokens, summary_vocab_size)
         logits = logits.view(batch_size * num_target_tokens, -1)
-        unnormalized_loss = self.loss(logits, targets)
+
+        # shape: (batch_size, num_target_tokens)
+        losses = self.loss(logits, targets).view(batch_size, num_target_tokens)
+
+        # shape: (batch_size, num_target_tokens)
+        targets = targets.view(batch_size, num_target_tokens)
+        losses_mask = (targets != self.pad_index).float()
+
+        loss = normalize_losses(losses, losses_mask,
+                                self.instance_loss_normalization,
+                                self.batch_loss_normalization)
 
         # Compute the token-level cross-entropy
-        num_targets = (targets != self.pad_index).long().sum()
-        cross_entropy = unnormalized_loss / num_targets
+        num_targets = losses_mask.long().sum()
+        cross_entropy = (losses * losses_mask).sum() / num_targets
 
-        if self.loss_normalization == 'summaries':
-            loss = unnormalized_loss / batch_size
-        elif self.loss_normalization == 'tokens':
-            loss = cross_entropy
         return loss, cross_entropy
 
     def _run_inference(self, initial_decoding_state: Dict[str, torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor]:
