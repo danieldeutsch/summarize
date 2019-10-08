@@ -40,7 +40,8 @@ class ClozeSeq2SeqModel(Seq2SeqModel):
                  cloze_namespace: str = 'tokens',
                  use_input_feeding: bool = False,
                  input_feeding_projection_layer: Optional[FeedForward] = None,
-                 loss_normalization: str = 'summaries',
+                 instance_loss_normalization: str = 'sum',
+                 batch_loss_normalization: str = 'average',
                  metrics: Optional[List[Metric]] = None,
                  initializer: InitializerApplicator = InitializerApplicator(),
                  regularizer: RegularizerApplicator = None) -> None:
@@ -56,7 +57,8 @@ class ClozeSeq2SeqModel(Seq2SeqModel):
                          summary_namespace=cloze_namespace,
                          use_input_feeding=use_input_feeding,
                          input_feeding_projection_layer=input_feeding_projection_layer,
-                         loss_normalization=loss_normalization,
+                         instance_loss_normalization=instance_loss_normalization,
+                         batch_loss_normalization=batch_loss_normalization,
                          metrics=metrics,
                          initializer=initializer,
                          regularizer=regularizer)
