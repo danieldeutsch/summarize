@@ -98,7 +98,8 @@ local hidden_size = 512;
       "hidden_size": hidden_size
     },
     "use_input_feeding": true,
-    "loss_normalization": "summary_length",
+    "instance_loss_normalization": "average",
+    "batch_loss_normalization": "average",
     "coverage_loss_weight": 0.0,
     "beam_search": {
       "type": "relaxed",
@@ -116,6 +117,7 @@ local hidden_size = 512;
         "beta": 5
       }
     },
+    "run_beam_search": true,
     "metrics": [
       {
         "type": "python-rouge",
@@ -129,15 +131,14 @@ local hidden_size = 512;
   "iterator": {
     "type": "bucket",
     "batch_size": 16,
-    "sorting_keys": [["document", "num_tokens"]],
+    "sorting_keys": [["summary", "num_tokens"]],
     "instances_per_epoch": 160000,
     "max_instances_in_memory": 160000
   },
   "validation_iterator": {
     "type": "bucket",
     "batch_size": 16,
-    "sorting_keys": [["document", "num_tokens"]],
-    "instances_per_epoch": 2000
+    "sorting_keys": [["summary", "num_tokens"]]
   },
   "trainer": {
     "optimizer": {
@@ -151,9 +152,9 @@ local hidden_size = 512;
       "milestones": std.range(5, 20)
     },
     "grad_norm": 2,
-    "validation_metric": "+R2-F1",
     "num_epochs": 20,
     "cuda_device": 0,
-    "shuffle": true
+    "shuffle": true,
+    "num_serialized_models_to_keep": 1
   }
 }
