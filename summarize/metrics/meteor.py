@@ -9,6 +9,8 @@ from typing import List
 
 from summarize.data.io import JsonlReader
 
+DEFAULT_METEOR_JAR_PATH = 'external/meteor/meteor-1.5/meteor-1.5.jar'
+
 
 def _load_summaries(file_path: str) -> List[str]:
     summaries = []
@@ -38,7 +40,7 @@ def _parse_meteor_stdout(stdout: str) -> float:
 @enforce.runtime_validation
 def run_meteor(gold_summaries: List[str],
                model_summaries: List[str],
-               meteor_jar_path: str = 'external/meteor/meteor-1.5/meteor-1.5.jar') -> float:
+               meteor_jar_path: str = DEFAULT_METEOR_JAR_PATH) -> float:
     if len(gold_summaries) != len(model_summaries):
         raise Exception(f'Unequal gold and model summaries. '
                         f'Found {len(gold_summaries)} and {len(model_summaries)}')
@@ -53,7 +55,7 @@ def run_meteor(gold_summaries: List[str],
                 'java', '-jar', meteor_jar_path,
                 model_file_path.name, gold_file_path.name,
                 '-l', 'en',
-                '-lower'
+                '-norm'
             ]
             command_string = ' '.join(command)
             logging.info(f'Running Meteor with command: "{command_string}"')
