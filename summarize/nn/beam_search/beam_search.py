@@ -43,8 +43,8 @@ class BeamSearch(Registrable):
     disallow_repeated_ngrams: ``int``, optional (default = ``None``)
         The order of n-gram to prevent repetitions of. If ``None``, any order n-gram
         can be repeated.
-    repeated_ngrams_exceptions: ``List[List[str]]``, optional (default = ``None``)
-        A list of n-grams which are exceptions to the disallowed rules.
+    repeated_ngrams_exceptions: ``List[str]``, optional (default = ``None``)
+        A list of unigrams which are exceptions to the disallowed repeated ngrams.
     length_penalizer: ``LengthPenalizer``, optional (default = ``None``)
         The length penalizer that should be used to rerank the candidate summaries
         after beam search has finished.
@@ -64,7 +64,7 @@ class BeamSearch(Registrable):
                  max_steps: int = 50,
                  per_node_beam_size: int = None,
                  disallow_repeated_ngrams: int = None,
-                 repeated_ngrams_exceptions: List[List[str]] = None,
+                 repeated_ngrams_exceptions: List[str] = None,
                  length_penalizer: LengthPenalizer = None,
                  coverage_penalizer: CoveragePenalizer = None) -> None:
         self.beam_size = beam_size
@@ -76,24 +76,15 @@ class BeamSearch(Registrable):
         self.length_penalizer = length_penalizer
         self.coverage_penalizer = coverage_penalizer
 
-        # Convert the ngram exceptions to tuples of the corresponding indices
+        # Convert the token exceptions to their indexes
         self.disallow_repeated_ngrams = disallow_repeated_ngrams
         self.repeated_ngrams_exceptions = set()
         repeated_ngrams_exceptions = repeated_ngrams_exceptions or []
         token_to_index = vocab.get_token_to_index_vocabulary(namespace)
-        for ngram in repeated_ngrams_exceptions:
-            if len(ngram) != disallow_repeated_ngrams:
-                raise Exception(f'Unable to add exception for {ngram} because the blocked ngram length is {disallow_repeated_ngrams}')
-            # Convert the ngram into the vocabulary indices. We additonally
-            # check to ensure each token is in the vocabulary. If the token isn't
-            # in the vocabulary and the user adds that token to the exceptions,
-            # it's likely a sign of a bug.
-            ngram_indices = []
-            for token in ngram:
-                if token not in token_to_index:
-                    raise Exception(f'Could not add ngram exception {ngram} because {token} is not in the vocabulary')
-                ngram_indices.append(token_to_index[token])
-            self.repeated_ngrams_exceptions.add(tuple(ngram_indices))
+        for token in repeated_ngrams_exceptions:
+            if token not in token_to_index:
+                raise Exception(f'Could not add token exception {token} because {token} is not in the vocabulary')
+            self.repeated_ngrams_exceptions.add(token_to_index[token])
 
     def _reconstruct_predictions(self,
                                  predictions: List[torch.Tensor],
@@ -157,68 +148,28 @@ class BeamSearch(Registrable):
         all_predictions = torch.cat(list(reversed(reconstructed_predictions)), 2)
         return all_predictions
 
-    def _mask_disallowed_ngrams(self, class_log_probabilities: torch.Tensor) -> None:
-        """
-        Performs an in-place modification of the class log-probabilities based on
-        not allowing certain ngrams to be repeated.
-        """
-        if self.disallow_repeated_ngrams is None:
-            return
-        if len(self.predictions) < self.disallow_repeated_ngrams:
+    def _mask_disallowed_ngrams(self, log_probs: torch.Tensor) -> None:
+        if self.disallow_repeated_ngrams is None or len(self.predictions) <= self.disallow_repeated_ngrams:
             return
 
-        batch_size = self.predictions[0].size(0)
-
-        # If we are disallowing repeated unigrams, there is no prefix to reconstruct.
-        # It's ugly, but we handle the case separately
-        if self.disallow_repeated_ngrams != 1:
-            # shape: (batch_size, beam_size, num_steps)
-            reconstructed_ngrams = \
-                self._reconstruct_predictions(self.predictions, self.backpointers,
-                                              num_steps=self.disallow_repeated_ngrams - 1)
+        predictions = self._reconstruct_predictions(self.predictions, self.backpointers)
+        batch_size, beam_size, num_tokens = predictions.size()
         for i in range(batch_size):
-            for j in range(self.beam_size):
-                if self.disallow_repeated_ngrams == 1:
-                    prefix = tuple()
-                else:
-                    prefix = tuple(reconstructed_ngrams[i, j].tolist())
-                if prefix in self.disallowed_ngrams[i][j]:
-                    for index in self.disallowed_ngrams[i][j][prefix]:
-                        class_log_probabilities[i * self.beam_size + j, index] = float('-inf')
+            for j in range(beam_size):
+                ngrams = set()
+                found_repeated = False
+                for start in range(0, num_tokens - self.disallow_repeated_ngrams + 1):
+                    ngram = predictions[i, j, start:start + self.disallow_repeated_ngrams].tolist()
+                    if set(ngram) & self.repeated_ngrams_exceptions:
+                        continue
+                    ngram = tuple(ngram)
+                    if ngram in ngrams:
+                        found_repeated = True
+                        break
+                    ngrams.add(ngram)
 
-    def _update_disallowed_ngrams(self) -> None:
-        batch_size = self.predictions[0].size(0)
-        updated_disallowed_ngrams = [[defaultdict(list) for _ in range(self.beam_size)] for _ in range(batch_size)]
-
-        if self.disallow_repeated_ngrams is None:
-            return updated_disallowed_ngrams
-        if len(self.predictions) < self.disallow_repeated_ngrams:
-            return updated_disallowed_ngrams
-
-        # Reconstruct all of the most recent ngrams
-        # shape: (batch_size, beam_size, num_steps)
-        reconstructed_ngrams = \
-            self._reconstruct_predictions(self.predictions, self.backpointers,
-                                          num_steps=self.disallow_repeated_ngrams)
-        for i in range(batch_size):
-            for j in range(self.beam_size):
-                # First, figure out where the last prediction came from. We need
-                # to copy those blocked ngrams. The backpointers are 1 shorter
-                # than the predictions (because there's no backpointer to the
-                # start token), so if its length is 0, that means there's nothing
-                # to copy
-                if len(self.backpointers) != 0:
-                    backpointer = self.backpointers[-1][i][j]
-                    updated_disallowed_ngrams[i][j].update(self.disallowed_ngrams[i][backpointer])
-
-                ngram = tuple(reconstructed_ngrams[i, j].tolist())
-                prefix, token = ngram[:-1], ngram[-1]
-                # Don't add this ngram to the disallowed set if it's
-                # part of the exceptions
-                if ngram not in self.repeated_ngrams_exceptions:
-                    updated_disallowed_ngrams[i][j][prefix].append(token)
-
-        self.disallowed_ngrams = updated_disallowed_ngrams
+                if found_repeated:
+                    log_probs[i, j] = float('-inf')
 
     def _apply_length_penalty(self,
                               final_predictions: List[List[torch.Tensor]],
@@ -228,7 +179,7 @@ class BeamSearch(Registrable):
             batch_size = len(final_predictions)
             for i in range(batch_size):
                 # shape: (beam_size)
-                length_penalties = self.length_penalizer(lengths[i])
+                length_penalties = self.length_penalizer(lengths[i] + 2)
                 # shape: (beam_size)
                 penalized_scores = final_log_probs[i] / length_penalties
                 # Sort the new scores in descending order
@@ -357,8 +308,6 @@ class BeamSearch(Registrable):
 
         self.log_probs.append(last_log_probabilities)
 
-        self._update_disallowed_ngrams()
-
         self.update_state()
 
         # Log probability tensor that mandates that the end token is selected.
@@ -422,7 +371,9 @@ class BeamSearch(Registrable):
 
             # If there are ngrams which are disallowed, we prevent any token
             # which would repeat an ngram from being generated
+            class_log_probabilities = class_log_probabilities.view(batch_size, self.beam_size, -1)
             self._mask_disallowed_ngrams(class_log_probabilities)
+            class_log_probabilities = class_log_probabilities.view(batch_size * self.beam_size, -1)
 
             # Here we are finding any beams where we predicted the end token in
             # the previous timestep and replacing the distribution with a
@@ -496,7 +447,7 @@ class BeamSearch(Registrable):
                 coverage_penalty = coverage_penalty.reshape(batch_size, self.beam_size * self.per_node_beam_size)
                 # shape: (batch_size, beam_size)
                 selected_coverage_penalties = coverage_penalty.gather(1, restricted_beam_indices)
-                last_log_probabilities -= selected_coverage_penalties
+                last_log_probabilities = last_log_probabilities - selected_coverage_penalties
                 # shape: (batch_size, beam_size * per_node_beam_size, num_document_tokens)
                 coverage = coverage.unsqueeze(2).\
                     expand(-1, -1, self.per_node_beam_size, -1).\
@@ -515,8 +466,6 @@ class BeamSearch(Registrable):
             backpointer = restricted_beam_indices / self.per_node_beam_size
 
             self.backpointers.append(backpointer)
-
-            self._update_disallowed_ngrams()
 
             self.update_state()
 
