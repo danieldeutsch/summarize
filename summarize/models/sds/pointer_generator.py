@@ -10,7 +10,7 @@ from allennlp.training.metrics import Metric
 from overrides import overrides
 from typing import Any, Dict, List, Optional, Tuple, Union
 
-from summarize.common.util import COPY_SYMBOL, SENT_START_SYMBOL, SENT_END_SYMBOL
+from summarize.common.util import SENT_START_SYMBOL, SENT_END_SYMBOL
 from summarize.modules.bridge import Bridge
 from summarize.modules.coverage_matrix_attention import CoverageMatrixAttention
 from summarize.modules.generate_probability_functions import GenerateProbabilityFunction
@@ -131,8 +131,6 @@ class PointerGeneratorModel(Model):
         self.end_index = token_to_index[END_SYMBOL]
         assert DEFAULT_PADDING_TOKEN in token_to_index
         self.pad_index = token_to_index[DEFAULT_PADDING_TOKEN]
-        assert COPY_SYMBOL in token_to_index
-        self.copy_index = token_to_index[COPY_SYMBOL]
         assert DEFAULT_OOV_TOKEN in token_to_index
         self.oov_index = token_to_index[DEFAULT_OOV_TOKEN]
         self.sent_start_index = None
@@ -263,15 +261,6 @@ class PointerGeneratorModel(Model):
         # shape: (batch_size, num_summary_tokens - 1, num_matches)
         summary_token_document_indices_mask = summary_token_document_indices_mask[:, 1:]
 
-        # We replace any out-of-vocabulary token with the copy index if it can
-        # be copied so the model can learn some representation of the copy index.
-        # During inference, if a token is copied, we use the copy index representation
-        # for input to the decoder. We only do this for the input tokens and not the
-        # target tokens because we don't want to teach the generative model to
-        # output the copy token.
-        # shape: (batch_size, num_summary_tokens - 1)
-        summary_input_tokens = self._replace_oov_with_copy(summary_input_tokens, summary_token_document_indices_mask)
-
         # Pass the input tokens through the decoding step
         # shape: (batch_size, num_summary_tokens - 1, summary_vocab_size)
         logits, state = self._decoder_step(summary_input_tokens, initial_decoding_state)
@@ -325,39 +314,6 @@ class PointerGeneratorModel(Model):
         self.cross_entropy_metric(total_loss.item(), num_targets.item())
 
         return loss
-
-    def _replace_oov_with_copy(self,
-                               tokens: torch.Tensor,
-                               token_document_indices_mask: torch.Tensor) -> torch.Tensor:
-        """
-        Replaces the indices in ``tokens`` that are out-of-vocabulary with the
-        copy index if the corresponding index appears in the document.
-
-        Parameters
-        ----------
-        tokens: (batch_size, num_summary_tokens)
-            A tensor of any size
-        token_document_indices_mask: (batch_size, num_summary_tokens, num_matches)
-            A mask which marks whether or not the token appears in the document
-
-        Returns
-        -------
-        torch.Tensor: (batch_size, num_summary_tokens)
-            A tensor with the out-of-vocabulary tokens replaced if possible.
-        """
-        # We can replace every token which is OOV and has a not-masked value
-        # shape: (batch_size, num_summary_tokens)
-        is_oov = tokens == self.oov_index
-        # To determine if this token can be copied (i.e., does it appear in the document)
-        # we can look at the first match because if it matches at all, it will be
-        # marked in the first index.
-        # shape: (batch_size, num_summary_tokens)
-        can_copy = token_document_indices_mask[:, :, 0] == 1
-        # shape: (batch_size, num_summary_tokens)
-        mask = (is_oov & can_copy).long()
-        # shape: (batch_size, num_summary_tokens)
-        tokens = (1 - mask) * tokens + mask * self.copy_index
-        return tokens
 
     def _compute_vocab_log_probs(self,
                                  logits: torch.Tensor,
@@ -417,7 +373,7 @@ class PointerGeneratorModel(Model):
         # they will have 0 probability here. This will cause numerical problems,
         # so we add a small value to the probabilities to prevent that
         # shape: (batch_size, num_targets)
-        copy_probabilities = copy_probabilities + 1e-30
+        copy_probabilities = copy_probabilities + 1e-20
 
         # shape: (batch_size, num_targets)
         log_copy_probabilities = torch.log(copy_probabilities)
@@ -671,7 +627,7 @@ class PointerGeneratorModel(Model):
         """
         vocab_size = self.vocab.get_vocab_size(self.summary_namespace)
         copy_mask = (tokens >= vocab_size).long()
-        return (1 - copy_mask) * tokens + copy_mask * self.copy_index
+        return (1 - copy_mask) * tokens + copy_mask * self.oov_index
 
     def _apply_input_feeding(self,
                              embedding: torch.Tensor,
