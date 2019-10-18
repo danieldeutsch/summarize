@@ -6,7 +6,7 @@ To analyze the results, run the python script `analyze_results.py` which will ou
 After the best hyperparameter settings are found, you can run the model on the test data to compute Rouge by running
 ```
 sh experiments/deutsch2019/extractive-step/sumfocus/run-max-words.sh \
-  https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/test.v1.0.jsonl.gz \
+  https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/test.v1.1.jsonl.gz \
   experiments/deutsch2019/extractive-step/sumfocus/output/test.max-words.jsonl \
   experiments/deutsch2019/extractive-step/sumfocus/output/test.max-words.metrics.jsonl \
   <beta> \
@@ -15,7 +15,7 @@ sh experiments/deutsch2019/extractive-step/sumfocus/run-max-words.sh \
   200
 
 sh experiments/deutsch2019/extractive-step/sumfocus/run-max-sents.sh \
-  https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/test.v1.0.jsonl.gz \
+  https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/test.v1.1.jsonl.gz \
   experiments/deutsch2019/extractive-step/sumfocus/output/test.max-sents.jsonl \
   experiments/deutsch2019/extractive-step/sumfocus/output/test.max-sents.metrics.jsonl \
   <beta> \

@@ -39,9 +39,9 @@ local decoder_hidden_size = 600;
     },
     "only_include_pretrained_words": true
   },
-  "train_data_path": "https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/train.v1.0.jsonl.gz",
-  "validation_data_path": "https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/valid.v1.0.jsonl.gz",
-  "test_data_path": "https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/test.v1.0.jsonl.gz",
+  "train_data_path": "https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/train.v1.1.jsonl.gz",
+  "validation_data_path": "https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/valid.v1.1.jsonl.gz",
+  "test_data_path": "https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/test.v1.1.jsonl.gz",
   // We can look at the test data because we only use pretrained words in the vocabulary
   "datasets_for_vocab_creation": ["train", "validation", "test"],
   "model": {
@@ -137,6 +137,7 @@ local decoder_hidden_size = 600;
     "grad_norm": 5,
     "num_epochs": 20,
     "validation_metric": "+R2-R",
-    "cuda_device": 0
+    "cuda_device": 0,
+    "num_serialized_models_to_keep": 1
   }
 }

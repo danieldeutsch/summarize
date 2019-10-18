@@ -165,6 +165,7 @@ local hidden_size = 512;
     "grad_norm": 5,
     "validation_metric": "+R2-F1",
     "num_epochs": 5,
-    "cuda_device": 0
+    "cuda_device": 0,
+    "num_serialized_models_to_keep": 1
   }
 }
