@@ -524,9 +524,9 @@ class PointerGeneratorModel(Model):
         # shape: (group_size, num_document_tokens, encoder_hidden_size)
         encoder_outputs = state['encoder_outputs']
         # shape: (group_size, decoder_hidden_size)
-        hidden = state['hidden']
+        hidden = state['hidden'].contiguous()
         # shape: (group_size, decoder_hidden_size)
-        memory = state['memory']
+        memory = state['memory'].contiguous()
         # shape: (group_size, decoder_hidden_size)
         input_feed = state['input_feed']
         # shape: (group_size, num_document_tokens)
