@@ -1,6 +1,13 @@
 # Deutsch 2019
 This directory contains the experiments related to "Summary Cloze: A New Task for Content Selection in Topic-Focused Summarization" by Deutsch and Roth (2019).
 
+## Demo
+A demo of the final models (with the topics and context) can be viewed by clicking this badge:
+
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/danieldeutsch/summarize/21054f43de1b363aba1e1283d62736e5117877bf?filepath=experiments%2Fdeutsch2019%2Fdemo.ipynb)
+
+If you run the Jupyter Notebook on the MyBinder servers, the abstractive model takes around 30 to 60 seconds to produce the output.
+
 ## Instructions
 First, it may be necessary to checkout [this commit](https://github.com/danieldeutsch/summarize/releases/tag/emnlp2019) since there could have been breaking changes to the code since the original models were trained.
 
