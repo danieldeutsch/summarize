@@ -18,15 +18,15 @@ The original dataset and tokenized versions can be downloaded here:
   <tbody>
     <tr>
       <td>Original</td>
-      <td>https://danieldeutsch.s3.amazonaws.com/summarize/data/wikicite/train.v1.0.jsonl.gz</td>
-      <td>https://danieldeutsch.s3.amazonaws.com/summarize/data/wikicite/valid.v1.0.jsonl.gz</td>
-      <td>https://danieldeutsch.s3.amazonaws.com/summarize/data/wikicite/test.v1.0.jsonl.gz</td>
+      <td>https://danieldeutsch.s3.amazonaws.com/summarize/data/wikicite/train.v1.1.jsonl.gz</td>
+      <td>https://danieldeutsch.s3.amazonaws.com/summarize/data/wikicite/valid.v1.1.jsonl.gz</td>
+      <td>https://danieldeutsch.s3.amazonaws.com/summarize/data/wikicite/test.v1.1.jsonl.gz</td>
     </tr>
     <tr>
       <td>Tokenized</td>
-      <td>https://danieldeutsch.s3.amazonaws.com/summarize/data/wikicite/train.tokenized.v1.0.jsonl.gz</td>
-      <td>https://danieldeutsch.s3.amazonaws.com/summarize/data/wikicite/valid.tokenized.v1.0.jsonl.gz</td>
-      <td>https://danieldeutsch.s3.amazonaws.com/summarize/data/wikicite/test.tokenized.v1.0.jsonl.gz</td>
+      <td>https://danieldeutsch.s3.amazonaws.com/summarize/data/wikicite/train.tokenized.v1.1.jsonl.gz</td>
+      <td>https://danieldeutsch.s3.amazonaws.com/summarize/data/wikicite/valid.tokenized.v1.1.jsonl.gz</td>
+      <td>https://danieldeutsch.s3.amazonaws.com/summarize/data/wikicite/test.tokenized.v1.1.jsonl.gz</td>
     </tr>
   </tbody>
 </table>
