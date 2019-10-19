@@ -100,15 +100,24 @@ python translate.py \
 In order to evaluate the output, both the ground-truth and model predictions need to be converted to the jsonl format using these commands, which should be run from the root of the `summarize` library:
 ```
 python experiments/onmt/convert_to_jsonl.py \
-  TODO
+  <OpenNMT-py>/data/cnndm/test.txt.tgt.tagged \
+  <OpenNMT-py>/data/cnndm/test.txt.tgt.tagged.jsonl
+
+  python experiments/onmt/convert_to_jsonl.py \
+    <OpenNMT-py>/output/pointer-generator/test.repeated-trigrams.out \
+    <OpenNMT-py>/output/pointer-generator/test.repeated-trigrams.jsonl
 ```
 Finally, compute ROUGE using the following commands:
 ```
 python -m summarize.metrics.rouge \
-  ... TODO
+  data/cnndm/test.txt.tgt.tagged.jsonl \
+  output/pointer-generator/test.min-length.jsonl \
+  --compute-rouge-l
 ```
 
 ## Results
+I do not know what the cause of the differences between the ROUGE scores is.
+I have done experiments where I verify the two libraries compute the same loss and return the same predictions from inference, but for some reason end up with different scores after training.
 <table>
   <thead>
     <tr>
@@ -127,22 +136,40 @@ python -m summarize.metrics.rouge \
   </thead>
   <tbody>
     <tr>
-      <td>min-length</td>
-      <td>a</td>
-      <td>b</td>
-      <td>c</td>
-      <td>d</td>
-      <td>e</td>
-      <td>f</td>
+      <td>+min-length</td>
+      <td>34.19</td>
+      <td>14.35</td>
+      <td>30.22</td>
+      <td>34.50</td>
+      <td>14.79</td>
+      <td>25.05</td>
     </tr>
     <tr>
-      <td>min-length, repeated ngrams</td>
-      <td>a</td>
-      <td>b</td>
-      <td>c</td>
-      <td>d</td>
-      <td>e</td>
-      <td>f</td>
+      <td>+disallow repeated trigrams</td>
+      <td>36.18</td>
+      <td>15.47</td>
+      <td>31.42</td>
+      <td>36.58</td>
+      <td>15.98</td>
+      <td>25.82</td>
+    </tr>
+    <tr>
+      <td>+length penalty</td>
+      <td>39.15</td>
+      <td>16.69</td>
+      <td>33.07</td>
+      <td>39.53</td>
+      <td>17.11</td>
+      <td>26.57</td>
+    </tr>
+    <tr>
+      <td>+coverage penalty</td>
+      <td>37.82</td>
+      <td>15.72</td>
+      <td>32.14</td>
+      <td>38.34</td>
+      <td>16.27</td>
+      <td>26.03</td>
     </tr>
   </tbody>
 </table>
