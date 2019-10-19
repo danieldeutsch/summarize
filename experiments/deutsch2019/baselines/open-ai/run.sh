@@ -8,13 +8,13 @@ model="345M"
 for split in valid test; do
   python -m summarize.models.cloze.open_ai_language_model \
     ${expt_dir}/models/${model} \
-    https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/${split}.v1.0.jsonl.gz \
+    https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/${split}.v1.1.jsonl.gz \
     ${output_dir}/${split}.jsonl \
     1 \
     40
 
   python -m summarize.metrics.rouge \
-    https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/${split}.v1.0.jsonl.gz \
+    https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/${split}.v1.1.jsonl.gz \
     ${output_dir}/${split}.jsonl \
     --gold-summary-field-name cloze \
     --model-summary-field-name cloze \

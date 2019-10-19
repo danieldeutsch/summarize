@@ -12,7 +12,7 @@ for beta in 0.1 0.5 1.0 2.0; do
     for context_lambda in 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0; do
       for split in valid; do
         name="beta_${beta}.topic-lambda-${topic_lambda}.context-lambda-${context_lambda}"
-        gold_file="https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/${split}.v1.0.jsonl.gz"
+        gold_file="https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/${split}.v1.1.jsonl.gz"
         model_file="${max_words_output_dir}/${split}.${name}.jsonl"
         metrics_file="${max_words_output_dir}/${split}.${name}.metrics.json"
 

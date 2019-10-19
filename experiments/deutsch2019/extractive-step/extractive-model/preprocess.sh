@@ -33,11 +33,11 @@ for split in train valid test; do
     --use-dataset-reader \
     --overrides '{"dataset_reader.max_num_sentences": null}' \
     ${model_file} \
-    https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/${split}.v1.0.jsonl.gz
+    https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/${split}.v1.1.jsonl.gz
 
   python -m summarize.utils.copy_jsonl_fields \
     ${temp_file} \
-    https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/${split}.v1.0.jsonl.gz \
+    https://danieldeutsch.s3.amazonaws.com/summarize/data/deutsch2019/${split}.v1.1.jsonl.gz \
     ${preprocess_dir}/${split}.jsonl.gz \
     --field-names cloze document
 

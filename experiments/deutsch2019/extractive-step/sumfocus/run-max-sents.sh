@@ -15,7 +15,7 @@ context_lambda=$6
 max_sents=$7
 
 mkdir -p $(dirname ${output_file})
-python -m summarize.models.cloze.sumfocused \
+python -m summarize.models.cloze.sumfocus \
   ${input_file} \
   ${output_file} \
   ${beta} \
