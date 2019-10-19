@@ -23,29 +23,29 @@ Here are links to the saved trained models, output, results, and preprocessed da
     <tr>
       <td align="center">True</td>
       <td align="center">True</td>
-      <td align="center"><a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/extractive-step/extractive-model/model/topics/context/model.tar.gz">Link</a></td>
-      <td align="center"><a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/extractive-step/extractive-model/output/topics/context/test.max-tokens.jsonl">200 Tokens</a>, <a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/extractive-step/extractive-model/output/topics/context/test.max-sents.jsonl">1 Sentence</a></td>
-      <td align="center"><a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/extractive-step/extractive-model/preprocessed/topics/context/train.jsonl.gz">Train</a>, <a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/extractive-step/extractive-model/preprocessed/topics/context/valid.jsonl.gz">Valid</a>, <a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/extractive-step/extractive-model/preprocessed/topics/context/test.jsonl.gz">Test</a></td>
+      <td align="center"><a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/v1.1/extractive-step/extractive-model/model/topics/context/model.tar.gz">Link</a></td>
+      <td align="center"><a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/v1.1/extractive-step/extractive-model/output/topics/context/test.max-tokens.jsonl">200 Tokens</a>, <a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/v1.1/extractive-step/extractive-model/output/topics/context/test.max-sents.jsonl">1 Sentence</a></td>
+      <td align="center"><a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/v1.1/extractive-step/extractive-model/preprocessed/topics/context/train.jsonl.gz">Train</a>, <a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/v1.1/extractive-step/extractive-model/preprocessed/topics/context/valid.jsonl.gz">Valid</a>, <a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/v1.1/extractive-step/extractive-model/preprocessed/topics/context/test.jsonl.gz">Test</a></td>
     </tr>
     <tr>
       <td align="center">True</td>
       <td align="center">False</td>
-      <td align="center"><a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/extractive-step/extractive-model/model/topics/no-context/model.tar.gz">Link</a></td>
-      <td align="center"><a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/extractive-step/extractive-model/output/topics/no-context/test.max-tokens.jsonl">200 Tokens</a>, <a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/extractive-step/extractive-model/output/topics/no-context/test.max-sents.jsonl">1 Sentence</a></td>
+      <td align="center"><a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/v1.1/extractive-step/extractive-model/model/topics/no-context/model.tar.gz">Link</a></td>
+      <td align="center"><a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/v1.1/extractive-step/extractive-model/output/topics/no-context/test.max-tokens.jsonl">200 Tokens</a>, <a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/v1.1/extractive-step/extractive-model/output/topics/no-context/test.max-sents.jsonl">1 Sentence</a></td>
       <td align="center">-</td>
     </tr>
     <tr>
       <td align="center">False</td>
       <td align="center">True</td>
-      <td align="center"><a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/extractive-step/extractive-model/model/no-topics/context/model.tar.gz">Link</a></td>
-      <td align="center"><a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/extractive-step/extractive-model/output/no-topics/context/test.max-tokens.jsonl">200 Tokens</a>, <a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/extractive-step/extractive-model/output/no-topics/context/test.max-sents.jsonl">1 Sentence</a></td>
+      <td align="center"><a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/v1.1/extractive-step/extractive-model/model/no-topics/context/model.tar.gz">Link</a></td>
+      <td align="center"><a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/v1.1/extractive-step/extractive-model/output/no-topics/context/test.max-tokens.jsonl">200 Tokens</a>, <a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/v1.1/extractive-step/extractive-model/output/no-topics/context/test.max-sents.jsonl">1 Sentence</a></td>
       <td align="center">-</td>
     </tr>
     <tr>
       <td align="center">False</td>
       <td align="center">False</td>
-      <td align="center"><a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/extractive-step/extractive-model/model/no-topics/no-context/model.tar.gz">Link</a></td>
-      <td align="center"><a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/extractive-step/extractive-model/output/no-topics/no-context/test.max-tokens.jsonl">200 Tokens</a>, <a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/extractive-step/extractive-model/output/no-topics/no-context/test.max-sents.jsonl">1 Sentence</a></td>
+      <td align="center"><a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/v1.1/extractive-step/extractive-model/model/no-topics/no-context/model.tar.gz">Link</a></td>
+      <td align="center"><a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/v1.1/extractive-step/extractive-model/output/no-topics/no-context/test.max-tokens.jsonl">200 Tokens</a>, <a href="https://danieldeutsch.s3.amazonaws.com/summarize/experiments/deutsch2019/v1.1/extractive-step/extractive-model/output/no-topics/no-context/test.max-sents.jsonl">1 Sentence</a></td>
       <td align="center">-</td>
     </tr>
   </tbody>
