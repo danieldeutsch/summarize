@@ -114,7 +114,8 @@ local hidden_size = 512;
       "hidden_size": hidden_size
     },
     "use_input_feeding": false,
-    "loss_normalization": "tokens",
+    "instance_loss_normalization": "average",
+    "batch_loss_normalization": "average",
     "coverage_loss_weight": 1.0,
     "beam_search": {
       "beam_size": 10,
