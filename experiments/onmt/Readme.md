@@ -4,6 +4,14 @@ The tests train and evaluate the sequence-to-sequence and pointer-generator mode
 There is a directory for each model that includes more details and the specific commands to reproduce the results.
 The OpenNMT commands come from the [summarization example](http://opennmt.net/OpenNMT-py/Summarization.html).
 
+## Demo
+The final trained model can be demoed using the MyBinder Jupyter Notebook by clicking on this badge:
+
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/danieldeutsch/summarize/574d0027262573291724c72641a3e4967e018030?filepath=experiments%2Fonmt%2Fdemo.ipynb)
+
+Please note that generating the summary can take about 1 minute on the MyBinder servers.
+
+
 ## OpenNMT Data Setup
 The preprocessing of the CNN/DailyMail dataset is common between both OpenNMT models.
 ```
