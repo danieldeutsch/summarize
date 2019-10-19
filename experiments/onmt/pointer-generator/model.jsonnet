@@ -32,11 +32,11 @@ local hidden_size = 512;
   "vocabulary": {
     "max_vocab_size": 50000,
     "tokens_to_add": {
-      "tokens": ["@start@", "@end@", "@sent_start@", "@sent_end@", "@copy@"]
+      "tokens": ["@start@", "@end@", "@sent_start@", "@sent_end@"]
     }
   },
-  "train_data_path": "https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/train.tokenized.v1.0.jsonl.gz",
-  "validation_data_path": "https://s3.amazonaws.com/danieldeutsch/summarize/data/cnn-dailymail/cnn-dailymail/valid.tokenized.v1.0.jsonl.gz",
+  "train_data_path": "https://danieldeutsch.s3.amazonaws.com/summarize/data/onmt/train.v1.0.jsonl.gz",
+  "validation_data_path": "https://danieldeutsch.s3.amazonaws.com/summarize/data/onmt/valid.v1.0.jsonl.gz",
   "datasets_for_vocab_creation": ["train"],
   "model": {
     "type": "sds-pointer-generator",
@@ -107,7 +107,7 @@ local hidden_size = 512;
       "min_steps": 35,
       "max_steps": 100,
       "disallow_repeated_ngrams": 3,
-      "repeated_ngrams_exceptions": [[".", "@sent_end@", "@sent_start@"]],
+      "repeated_ngrams_exceptions": [".", "@sent_end@", "@sent_start@"],
       "length_penalizer": {
         "type": "wu",
         "alpha": 0.9
@@ -133,7 +133,7 @@ local hidden_size = 512;
     "batch_size": 16,
     "sorting_keys": [["summary", "num_tokens"]],
     "instances_per_epoch": 160000,
-    "max_instances_in_memory": 160000
+    "max_instances_in_memory": 100000
   },
   "validation_iterator": {
     "type": "bucket",
@@ -154,7 +154,6 @@ local hidden_size = 512;
     "grad_norm": 2,
     "num_epochs": 20,
     "cuda_device": 0,
-    "shuffle": true,
-    "num_serialized_models_to_keep": 1
+    "num_serialized_models_to_keep": 5
   }
 }

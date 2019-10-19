@@ -15,4 +15,5 @@ allennlp train \
   --include-package summarize \
   --serialization-dir ${model_dir} \
   --overrides '{"model.run_beam_search": false}' \
+  --file-friendly-logging \
   ${model_config}
