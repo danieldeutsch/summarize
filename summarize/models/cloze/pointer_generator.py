@@ -102,9 +102,6 @@ class ClozePointerGeneratorModel(PointerGeneratorModel):
 
         # shape: (batch_size, num_context_tokens)
         cloze_input_tokens = context['tokens']
-        # shape: (batch_size, num_context_tokens)
-        cloze_input_tokens = self._replace_oov_with_copy(cloze_input_tokens, context_token_document_indices_mask)
-
         # shape: (group_size, num_summary_tokens, embedding_size)
         cloze_token_embeddings = self.summary_token_embedder(cloze_input_tokens)
 
