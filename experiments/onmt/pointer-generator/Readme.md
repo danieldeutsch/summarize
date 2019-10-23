@@ -2,11 +2,12 @@
 To train, predict, and evaluate with the Summarize models, run
 ```
 sh experiments/onmt/pointer-generator/train.sh
+sh experiments/onmt/pointer-generator/replace-config.sh
 sh experiments/onmt/pointer-generator/predict.sh
 sh experiments/onmt/pointer-generator/evaluate.sh
 ```
 The output and metrics will be written to the `output` and `results` directories, respectively.
-The trained model can be downloaded here TODO
+The trained model can be downloaded [here](https://danieldeutsch.s3.amazonaws.com/summarize/experiments/onmt/v1.0/pointer-generator/model/model.tar.gz).
 
 ## OpenNMT Commands
 To train the OpenNMT model, run the following command from the root of the `OpenNMT-py` directory:
