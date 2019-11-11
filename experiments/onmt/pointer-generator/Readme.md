@@ -104,9 +104,9 @@ python experiments/onmt/convert_to_jsonl.py \
   <OpenNMT-py>/data/cnndm/test.txt.tgt.tagged \
   <OpenNMT-py>/data/cnndm/test.txt.tgt.tagged.jsonl
 
-  python experiments/onmt/convert_to_jsonl.py \
-    <OpenNMT-py>/output/pointer-generator/test.repeated-trigrams.out \
-    <OpenNMT-py>/output/pointer-generator/test.repeated-trigrams.jsonl
+python experiments/onmt/convert_to_jsonl.py \
+  <OpenNMT-py>/output/pointer-generator/test.repeated-trigrams.out \
+  <OpenNMT-py>/output/pointer-generator/test.repeated-trigrams.jsonl
 ```
 Finally, compute ROUGE using the following commands:
 ```
